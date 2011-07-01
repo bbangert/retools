@@ -10,8 +10,6 @@ configured process-wide::
 """
 from redis import Redis
 
-from retools.redconn import Connection
-
 __all__ = ['Connection']
 
 
