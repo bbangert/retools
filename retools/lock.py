@@ -1,4 +1,4 @@
-"""A Redis backed global lock
+"""A Redis backed distributed global lock
 
 This lock based mostly on this excellent example:
 http://chris-lamb.co.uk/2010/06/07/distributing-locking-python-and-redis/
@@ -17,7 +17,7 @@ import time
 from retools import Connection
 
 
-class GlobalLock(object):
+class Lock(object):
     def __init__(self, key, expires=60, timeout=10, redis=None):
         """
         Distributed locking using Redis SETNX and GETSET.
