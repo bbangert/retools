@@ -1,26 +1,33 @@
-from setuptools import setup, find_packages
-import sys, os
+__version__ = '0.1'
 
-version = '0.1'
+import os
+
+from setuptools import setup, find_packages
+
+here = os.path.abspath(os.path.dirname(__file__))
+README = open(os.path.join(here, 'README.rst')).read()
+CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 setup(name='retools',
-      version=version,
-      description="Redis Tools",
-      long_description="""\
-""",
-      classifiers=[], # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
-      keywords='',
-      author='',
-      author_email='',
-      url='',
-      license='',
-      packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
+      version=__version__,
+      description='Redis Tools',
+      long_description=README + '\n\n' +  CHANGES,
+      classifiers=[
+        "Intended Audience :: Developers",
+        "Programming Language :: Python",
+        ],
+      keywords='cache redis queue',
+      author="Ben Bangert",
+      author_email="ben@groovie.org",
+      url="",
+      license="MIT",
+      packages=find_packages(),
       include_package_data=True,
       zip_safe=False,
+      tests_require = ['pkginfo'],
       install_requires=[
-          # -*- Extra requirements: -*-
+          "setproctitle>=1.1.2",
+          "redis>=2.4.5",
+          "venusian>=0.9",
       ],
-      entry_points="""
-      # -*- Entry points: -*-
-      """,
-      )
+)
