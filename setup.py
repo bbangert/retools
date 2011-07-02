@@ -29,5 +29,6 @@ setup(name='retools',
           "setproctitle>=1.1.2",
           "redis>=2.4.5",
           "venusian>=0.9",
+          "decorator>=3.3.0",
       ],
 )

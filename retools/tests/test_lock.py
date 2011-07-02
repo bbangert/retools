@@ -47,14 +47,16 @@ class TestLock(unittest.TestCase):
         mock_time = Mock()
         mock_time.return_value = 0
         
+        array = []
         @raises(timeout)
         @patch('retools.Connection.get_default', mock)
         @patch('time.sleep', mock_time)
         def test_it():
             lock = self._makeOne()
             with lock('somekey', timeout=1, redis=dummy):
-                val = 2 + 4 # pragma: nocover
+                array.append(4) # pragma: nocover
         test_it()
+        assert len(array) == 0
 
 
 class DummyRedis(object):
