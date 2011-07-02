@@ -36,13 +36,13 @@ def with_nested_contexts(context_managers, func, kwargs):
                 return func(**kwargs)
         
         # is equivilant to
-        ctx_managers = [ContextB, ContextA]
+        ctx_managers = [ContextA, ContextB]
         return with_nested_contexts(ctx_managers, func, kwargs)
     
     """
     if not context_libs:
         return func(*kwargs)
     else:
-        ctx_manager = context_managers[-1]
+        ctx_manager = context_managers[0]
         with ctx_manager(**kwargs):
-            return with_nested_contexts(context_managers[:-1], func, kwargs)
+            return with_nested_contexts(context_managers[1:], func, kwargs)
