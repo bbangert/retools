@@ -16,7 +16,7 @@ def func_namespace(func):
 
 def has_self_arg(func):
     """Return True if the given function has a 'self' argument."""
-    return inspect.getargspec(func)[0][0] in ('self', 'cls')
+    return inspect.getargspec(func)[0] and inspect.getargspec(func)[0][0] in ('self', 'cls')
 
 
 def with_nested_contexts(context_managers, func, kwargs):
