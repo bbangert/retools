@@ -23,11 +23,6 @@ class TestCacheRegion(unittest.TestCase):
         from retools.cache import CacheRegion
         return CacheRegion
     
-    def _make_Mock(self):
-        from retools import Connection
-        mock = Mock(spec=Connection)
-        return mock
-    
     def test_add_region(self):
         CR = self._makeOne()
         CR.add_region('short_term', 60)
@@ -48,3 +43,4 @@ class TestCacheRegion(unittest.TestCase):
             return "This is a value: %s" % time.time()
         value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func)
         assert 'This is a value' in value
+        eq_(mock_execute.call_count, 2)
