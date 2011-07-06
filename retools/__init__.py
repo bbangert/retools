@@ -23,4 +23,8 @@ class Connection(object):
 
     @classmethod
     def get_default(cls):
-        return Connection.redis
+        if cls.redis:
+            return cls.redis
+        else:
+            cls.redis = Redis()
+            return cls.redis
