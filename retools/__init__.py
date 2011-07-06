@@ -14,11 +14,14 @@ __all__ = ['Connection']
 
 
 class Connection(object):
+    # For testing
+    Redis = Redis
+    
     redis = None
     
     @classmethod
     def set_default(cls, host='localhost', port=6379, db=0, password=None):
-        Connection.redis = Redis(host=host, port=port, db=db,
+        cls.redis = cls.Redis(host=host, port=port, db=db,
                                  password=password)
 
     @classmethod
@@ -26,5 +29,5 @@ class Connection(object):
         if cls.redis:
             return cls.redis
         else:
-            cls.redis = Redis()
+            cls.redis = cls.Redis()
             return cls.redis
