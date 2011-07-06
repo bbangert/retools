@@ -41,8 +41,8 @@ def with_nested_contexts(context_managers, func, kwargs):
     
     """
     if not context_managers:
-        return func(*kwargs)
+        return func(**kwargs)
     else:
         ctx_manager = context_managers[0]
-        with ctx_manager(**kwargs):
+        with ctx_manager(func, **kwargs):
             return with_nested_contexts(context_managers[1:], func, kwargs)
