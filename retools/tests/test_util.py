@@ -5,17 +5,17 @@ from contextlib import contextmanager
 from nose.tools import eq_
 
 class TestNamespaceFunc(unittest.TestCase):
-    def _makeKey(self, func):
+    def _makeKey(self, func, deco_args):
         from retools.util import func_namespace
-        return func_namespace(func)
+        return func_namespace(func, deco_args)
     
     def test_func_name(self):
         def a_func(): pass
-        eq_('retools.tests.test_util.a_func', self._makeKey(a_func))
+        eq_('retools.tests.test_util.a_func.', self._makeKey(a_func, []))
     
     def test_class_method_name(self):
         # This simulates the class method by checking for 'cls' arg
-        eq_('retools.tests.test_util.DummyClass', self._makeKey(DummyClass.class_method))
+        eq_('retools.tests.test_util.DummyClass.', self._makeKey(DummyClass.class_method, []))
 
 class TestContextManager(unittest.TestCase):
     def _call_with_contexts(self, ctx_managers, func, kwargs):

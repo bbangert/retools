@@ -1,17 +1,18 @@
 """Utility functions"""
 import inspect
 
-def func_namespace(func):
+def func_namespace(func, deco_args):
     """Generates a unique namespace for a function"""
     kls = None
     if hasattr(func, 'im_func'):
         kls = func.im_class
         func = func.im_func
-
+    
+    deco_key = " ".join(map(str, deco_args))    
     if kls:
-        return '%s.%s' % (kls.__module__, kls.__name__)
+        return '%s.%s.%s' % (kls.__module__, kls.__name__, deco_key)
     else:
-        return '%s.%s' % (func.__module__, func.__name__)
+        return '%s.%s.%s' % (func.__module__, func.__name__, deco_key)
 
 
 def has_self_arg(func):

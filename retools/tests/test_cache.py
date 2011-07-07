@@ -173,6 +173,159 @@ class TestCacheRegion(unittest.TestCase):
             eq_(len(exec_calls), 1)
 
 
+class TestInvalidateRegion(unittest.TestCase):
+    def _makeOne(self):
+        from retools.cache import invalidate_region
+        return invalidate_region
+    
+    def _makeCR(self):
+        from retools.cache import CacheRegion
+        CacheRegion.regions = {}
+        return CacheRegion
+    
+    def test_invalidate_region_empty(self):
+        mock_redis = Mock(spec=redis.client.Redis)        
+        mock_redis.smembers.return_value = set([])
+        
+        invalidate_region = self._makeOne()
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_region('short_term')
+            eq_(len(mock_redis.method_calls), 1)
+
+    def test_invalidate_small_region(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        results = [set(['keyspace']), set(['a_func'])]
+        def side_effect(*args):
+            return results.pop()
+        
+        mock_redis.smembers.side_effect = side_effect
+        
+        invalidate_region = self._makeOne()
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_region('short_term')
+            calls = mock_redis.method_calls
+            eq_(calls[0][1], ('retools:short_term:namespaces',))
+            eq_(calls[2][0], 'pipeline')
+            eq_(len(calls), 5)
+
+    def test_invalidate_small_region_and_clear(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        mock_redis.pipeline.return_value = mock_pipeline
+        results = [set(['keyspace']), set(['a_func'])]
+        def side_effect(*args):
+            return results.pop()
+        
+        mock_redis.smembers.side_effect = side_effect
+        
+        invalidate_region = self._makeOne()
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_region('short_term', clear=True)
+            calls = mock_redis.method_calls
+            eq_(calls[0][1], ('retools:short_term:namespaces',))
+            eq_(calls[2][0], 'pipeline')
+            eq_(len(mock_pipeline.method_calls), 6)
+            eq_(len(calls), 5)
+
+    def test_remove_nonexistent_key(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        mock_redis.pipeline.return_value = mock_pipeline
+        results = [set(['keyspace']), set(['a_func'])]
+        def side_effect(*args):
+            return results.pop()
+        
+        mock_redis.smembers.side_effect = side_effect
+        mock_redis.exists.return_value = False
+        
+        invalidate_region = self._makeOne()
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_region('short_term', clear=True)
+            calls = mock_redis.method_calls
+            eq_(calls[0][1], ('retools:short_term:namespaces',))
+            eq_(calls[2][0], 'pipeline')
+            eq_(len(mock_pipeline.method_calls), 8)
+            eq_(len(calls), 5)
+
+
+class TestInvalidFunction(unittest.TestCase):
+    def _makeOne(self):
+        from retools.cache import invalidate_function
+        return invalidate_function
+
+    def _makeCR(self):
+        from retools.cache import CacheRegion
+        CacheRegion.regions = {}
+        return CacheRegion
+    
+    def test_invalidate_function_without_args(self):
+        def my_func(): return "Hello"
+        my_func._region = 'short_term'
+        my_func._namespace = 'retools:a_key'
+        
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_redis.smembers.return_value = set(['1'])
+        
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        mock_redis.pipeline.return_value = mock_pipeline
+        
+        invalidate_function = self._makeOne()
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_function(my_func, [])
+            calls = mock_redis.method_calls
+            print calls
+            eq_(calls[0][1], ('retools:short_term:retools:a_key:keys',))
+            eq_(len(calls), 2)
+
+    def test_invalidate_function_with_args(self):
+        def my_func(name): return "Hello %s" % name
+        my_func._region = 'short_term'
+        my_func._namespace = 'retools:a_key decarg'
+        
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_redis.smembers.return_value = set(['1'])
+        
+        invalidate_function = self._makeOne()        
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_function(my_func, ['decarg'], 'fred')
+            calls = mock_redis.method_calls
+            eq_(calls[0][1][0], 'retools:short_term:retools:a_key decarg:fred')
+            eq_(calls[0][0], 'hset')
+            eq_(len(calls), 1)
+            
+            # And a unicode key
+            mock_redis.reset_mock()
+            invalidate_function(my_func, ['decarg'], u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
+            calls = mock_redis.method_calls
+            eq_(calls[0][1][0], u'retools:short_term:retools:a_key decarg:\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
+            eq_(calls[0][0], 'hset')
+            eq_(len(calls), 1)
+
+
 class TestCacheDecorator(unittest.TestCase):
     def _makeOne(self):
         from retools.cache import CacheRegion

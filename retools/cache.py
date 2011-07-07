@@ -94,7 +94,7 @@ class CacheRegion(object):
         pipeline.sadd('retools:regions', region)
         pipeline.sadd('retools:%s:namespaces' % region, namespace)
         pipeline.sadd('retools:%s:%s:keys' % (region, namespace), key)
-            
+    
     @classmethod
     def load(cls, region, namespace, key, regenerate=True, callable=None):
         """Load a value from Redis
@@ -120,7 +120,9 @@ class CacheRegion(object):
         p.get(keys.redis_hit_key)
         p.incr(keys.redis_hit_key)
         results = p.execute()
-        result, existing_hits = results[0], int(results[1])
+        result, existing_hits = results[0], results[1]
+        if existing_hits:
+            existing_hits = int(existing_hits)
         expired = True
         if result and now - float(result['created']) < expires:
             expired = False
@@ -167,6 +169,103 @@ class CacheRegion(object):
         else:
             redis.incr(keys.redis_hit_key, amount=existing_hits)
         return value
+
+
+def invalidate_region(region, clear=False):
+    """Invalidate all the namespace's in a given region
+
+    clear
+        Whether the values should be removed entirely, or merely
+        invalidated.
+
+    """
+    redis = Connection.get_default()
+    namespaces = redis.smembers('retools:%s:namespaces' % region)
+    if not namespaces:
+        return None
+    
+    # Locate the longest expiration of a region, so we can set
+    # the created value far enough back to force a refresh
+    longest_expire = max([x['expires'] for x in CacheRegion.regions.values()])
+    new_created = time.time() - longest_expire - 3600
+    
+    for ns in namespaces:
+        cache_keyset_key = 'retools:%s:%s:keys' % (region, ns)
+        keys = set(['']) | redis.smembers(cache_keyset_key)
+        p = redis.pipeline(transaction=True)
+        for key in keys:
+            cache_key = 'retools:%s:%s:%s' % (region, ns, key)
+            if not redis.exists(cache_key):
+                p.srem(cache_keyset_key, key)
+            if clear:
+                p.srem(cache_keyset_key, key)
+                p.delete(cache_key)
+            else:
+                p.hset(cache_key, 'created', new_created)
+        if clear:
+            p.srem('retools:%s:namespaces' % region, ns)
+        p.execute()
+
+
+def invalidate_function(func, deco_args=None, *args):
+    """Invalidate the cache for a function
+
+    func
+        The function that was decorated by cache_region.
+    
+    deco_args
+        Argument list passed to decorator for differentiation.
+
+    args
+        Arguments the decorator + function was called with that should
+        be invalidated. If the args is just the differentiator for the
+        function, or not present, then all values for the function
+        will be invalidated.
+    
+    Example::
+        
+        @cache_region('short_term', 'small_engine')
+        def local_search(search_term):
+            # do search and return it
+        
+        @cache_region('long_term')
+        def lookup_folks():
+            # look them up and return them
+        
+        # To clear local_search for search_term = 'fred'
+        invalidate_function(local_search, 'small_engine', 'fred')
+        
+        # To clear all cached variations of the local_search function
+        invalidate_function(local_search, 'small_engine')
+        
+        # To clear out lookup_folks
+        invalidate_function(lookup_folks)
+    
+    """
+    deco_args = deco_args or []
+    redis = Connection.get_default()
+    region = func._region
+    namespace = func._namespace
+    
+    # Get the expiration for this region
+    new_created = time.time() - CacheRegion.regions[region]['expires'] - 3600
+    
+    if args:
+        try:
+            cache_key = " ".join(map(str, args))
+        except UnicodeEncodeError:
+            cache_key = " ".join(map(unicode, args))
+        redis.hset('retools:%s:%s:%s' % (region, namespace, cache_key),
+                   'created', new_created)
+    else:
+        cache_keyset_key = 'retools:%s:%s:keys' % (region, namespace)
+        keys = set(['']) | redis.smembers(cache_keyset_key)
+        p = redis.pipeline(transaction=True)
+        for key in keys:
+            p.hset('retools:%s:%s:%s' % (region, namespace, key), 'created',
+                   new_created)
+        p.execute()
+    return None
 
 
 def cache_region(region, *deco_args):
@@ -230,7 +329,7 @@ def cache_region(region, *deco_args):
     
     """
     def decorate(func):
-        namespace = func_namespace(func)
+        namespace = func_namespace(func, deco_args)
         skip_self = has_self_arg(func)
         def cached(*args):
             if region not in CacheRegion.regions:
@@ -238,19 +337,21 @@ def cache_region(region, *deco_args):
                     'Cache region not configured: %s' % region)
             if not CacheRegion.enabled:
                 return func(*args)
-
+            
             if skip_self:
                 try:
-                    cache_key = " ".join(map(str, deco_args + args[1:]))
+                    cache_key = " ".join(map(str, args[1:]))
                 except UnicodeEncodeError:
-                    cache_key = " ".join(map(unicode, deco_args + args[1:]))
+                    cache_key = " ".join(map(unicode, args[1:]))
             else:
                 try:
-                    cache_key = " ".join(map(str, deco_args + args))
+                    cache_key = " ".join(map(str, args))
                 except UnicodeEncodeError:
-                    cache_key = " ".join(map(unicode, deco_args + args))
+                    cache_key = " ".join(map(unicode, args))
             def go():
                 return func(*args)
             return CacheRegion.load(region, namespace, cache_key, callable=go)
+        cached._region = region
+        cached._namespace = namespace
         return cached
     return decorate
