@@ -40,8 +40,8 @@ Example::
 Locking
 =======
 
-A Redis based lock implemented as a Python context manager, based on the
-`Chris Lamb's example
+A Redis based lock implemented as a Python context manager, based on `Chris
+Lamb's example
 <http://chris-lamb.co.uk/2010/06/07/distributing-locking-python-and-redis/>`_.
 
 Example::
