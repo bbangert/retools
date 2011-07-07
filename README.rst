@@ -25,7 +25,7 @@ along with recording what regions are used by which functions and arguments.
 
 Example::
     
-    from retools.cache import CacheRegion, cache_region
+    from retools.cache import CacheRegion, cache_region, invalidate_function
     
     CacheRegion.add_region('short_term', expires=3600)
     
@@ -35,6 +35,9 @@ Example::
         return results
     
     my_results = slow_function('bunny')
+    
+    # Invalidate the cache for 'bunny'
+    invalidate_function(slow_function, [], 'bunny')
 
 
 Locking
