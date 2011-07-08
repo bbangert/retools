@@ -2,7 +2,9 @@
 Redis Tools (retools)
 =====================
 
-``retools`` is a package of Redis tools.
+``retools`` is a package of Redis tools. It's aim is to provide a variety of
+Redis backed Python tools that are always 100% unit tested, fast, efficient,
+and utilize the capabilities of Redis.
 
 Current tools in ``retools``:
 
@@ -38,6 +40,20 @@ Example::
     
     # Invalidate the cache for 'bunny'
     invalidate_function(slow_function, [], 'bunny')
+
+
+Differences from Beaker
+-----------------------
+
+Unlike Beaker's caching system, this is built strictly for Redis. As such, it
+adds several features that Beaker doesn't possess:
+
+* A distributed write-lock so that only one writer updates the cache at a time
+  across a cluster.
+* Hit/Miss cache statistics to give you insight into what caches are less
+  effectively utilized (and may need either higher expiration times, or just
+  not very worthwhile to cache).
+* Very small, compact code-base with 100% unit test coverage.
 
 
 Locking
