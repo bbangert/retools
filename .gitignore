@@ -19,6 +19,7 @@ jyenv/
 pypyenv/
 build/
 dist/
+docs/_build
 bin/
 lib/
 include/
