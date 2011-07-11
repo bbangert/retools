@@ -171,14 +171,8 @@ class CacheRegion(object):
         return value
 
 
-def invalidate_region(region, clear=False):
-    """Invalidate all the namespace's in a given region
-
-    clear
-        Whether the values should be removed entirely, or merely
-        invalidated.
-
-    """
+def invalidate_region(region):
+    """Invalidate all the namespace's in a given region"""
     redis = Connection.get_default()
     namespaces = redis.smembers('retools:%s:namespaces' % region)
     if not namespaces:
@@ -192,19 +186,12 @@ def invalidate_region(region, clear=False):
     for ns in namespaces:
         cache_keyset_key = 'retools:%s:%s:keys' % (region, ns)
         keys = set(['']) | redis.smembers(cache_keyset_key)
-        p = redis.pipeline(transaction=True)
         for key in keys:
             cache_key = 'retools:%s:%s:%s' % (region, ns, key)
             if not redis.exists(cache_key):
-                p.srem(cache_keyset_key, key)
-            if clear:
-                p.srem(cache_keyset_key, key)
-                p.delete(cache_key)
+                redis.srem(cache_keyset_key, key)
             else:
-                p.hset(cache_key, 'created', new_created)
-        if clear:
-            p.srem('retools:%s:namespaces' % region, ns)
-        p.execute()
+                redis.hset(cache_key, 'created', new_created)
 
 
 def invalidate_function(func, deco_args=None, *args):

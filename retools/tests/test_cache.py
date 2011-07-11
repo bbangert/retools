@@ -213,36 +213,10 @@ class TestInvalidateRegion(unittest.TestCase):
             invalidate_region('short_term')
             calls = mock_redis.method_calls
             eq_(calls[0][1], ('retools:short_term:namespaces',))
-            eq_(calls[2][0], 'pipeline')
-            eq_(len(calls), 5)
-
-    def test_invalidate_small_region_and_clear(self):
-        mock_redis = Mock(spec=redis.client.Redis)
-        mock_pipeline = Mock(spec=redis.client.Pipeline)
-        mock_redis.pipeline.return_value = mock_pipeline
-        results = [set(['keyspace']), set(['a_func'])]
-        def side_effect(*args):
-            return results.pop()
-        
-        mock_redis.smembers.side_effect = side_effect
-        
-        invalidate_region = self._makeOne()
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
-            CR = self._makeCR()
-            CR.add_region('short_term', expires=600)
-            
-            invalidate_region('short_term', clear=True)
-            calls = mock_redis.method_calls
-            eq_(calls[0][1], ('retools:short_term:namespaces',))
-            eq_(calls[2][0], 'pipeline')
-            eq_(len(mock_pipeline.method_calls), 6)
-            eq_(len(calls), 5)
+            eq_(len(calls), 6)
 
     def test_remove_nonexistent_key(self):
         mock_redis = Mock(spec=redis.client.Redis)
-        mock_pipeline = Mock(spec=redis.client.Pipeline)
-        mock_redis.pipeline.return_value = mock_pipeline
         results = [set(['keyspace']), set(['a_func'])]
         def side_effect(*args):
             return results.pop()
@@ -256,12 +230,10 @@ class TestInvalidateRegion(unittest.TestCase):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
-            invalidate_region('short_term', clear=True)
+            invalidate_region('short_term')
             calls = mock_redis.method_calls
             eq_(calls[0][1], ('retools:short_term:namespaces',))
-            eq_(calls[2][0], 'pipeline')
-            eq_(len(mock_pipeline.method_calls), 8)
-            eq_(len(calls), 5)
+            eq_(len(calls), 6)
 
 
 class TestInvalidFunction(unittest.TestCase):
@@ -293,7 +265,6 @@ class TestInvalidFunction(unittest.TestCase):
             
             invalidate_function(my_func, [])
             calls = mock_redis.method_calls
-            print calls
             eq_(calls[0][1], ('retools:short_term:retools:a_key:keys',))
             eq_(len(calls), 2)
 
