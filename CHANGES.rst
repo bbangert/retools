@@ -2,14 +2,21 @@
 retools
 =======
 
-Next release
-============
-
-- Job/Worker system based on Ruby's Resque model.
-
 
 0.2 (**tip**)
 =============
+
+Features
+--------
+
+- Statistics for the cache is now optional and can be disabled to slightly
+  reduce the Redis queries used to store/retrieve cache data.
+
+Internals
+---------
+
+- Increased conditional coverage to 100% (via instrumental).
+
 
 Incompatibilities
 -----------------

@@ -57,13 +57,106 @@ class TestCacheRegion(unittest.TestCase):
             value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func)
             assert 'This is a value' in value
             exec_calls = [x for x in mock_pipeline.method_calls if x[0] == 'execute']
+            eq_(len(mock_pipeline.method_calls), 10)
             eq_(len(exec_calls), 2)
+
+    def test_existing_value_no_regen(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        results = ['0', ({'created': '111', 'value': "S'This is a value: 1311702429.28'\n."}, '0')]
+        def side_effect(*args, **kwargs):
+            return results.pop()
+
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_pipeline.execute.side_effect = side_effect
+        mock_redis.hgetall.return_value = {}
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeOne()
+            CR.add_region('short_term', 60)            
+            value = CR.load('short_term', 'my_func', '1 2 3', regenerate=False)
+            assert 'This is a value' in value
+            exec_calls = [x for x in mock_pipeline.method_calls if x[0] == 'execute']
+            eq_(len(mock_pipeline.method_calls), 4)
+            eq_(len(exec_calls), 1)
+
+    def test_value_created_after_check_but_expired(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        results = ['0', (None, '0')]
+        def side_effect(*args, **kwargs):
+            return results.pop()
+
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_pipeline.execute.side_effect = side_effect
+        mock_redis.hgetall.return_value = {'created': '1', 'value': "S'This is a value: 1311702429.28'\n."}
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeOne()
+            CR.add_region('short_term', 60)
+            def a_func():
+                return "This is a value: %s" % time.time()
+            
+            value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func)
+            assert 'This is a value' in value
+            exec_calls = [x for x in mock_pipeline.method_calls if x[0] == 'execute']
+            eq_(len(mock_pipeline.method_calls), 10)
+            eq_(len(exec_calls), 2)
+
+    def test_value_expired_and_no_lock(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        results = ['0', ({'created': '111', 'value': "S'This is a value: 1311702429.28'\n."}, '0')]
+        def side_effect(*args, **kwargs):
+            return results.pop()
+
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_pipeline.execute.side_effect = side_effect
+        mock_redis.hgetall.return_value = {}
+        mock_redis.exists.return_value = False
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeOne()
+            CR.add_region('short_term', 60)
+            def a_func(): return "This is a value: %s" % time.time()
+            
+            value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func)
+            assert 'This is a value' in value
+            exec_calls = [x for x in mock_pipeline.method_calls if x[0] == 'execute']
+            eq_(len(mock_pipeline.method_calls), 10)
+            eq_(len(exec_calls), 2)
+
+    def test_generate_value_no_stats(self):
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        results = ['0', (None, '0')]
+        def side_effect(*args, **kwargs):
+            return results.pop()
+        
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_pipeline.execute.side_effect = side_effect
+        mock_redis.hgetall.return_value = {}
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeOne()
+            CR.add_region('short_term', 60)
+            
+            now = time.time()
+            def a_func():
+                return "This is a value: %s" % now
+            value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func,
+                            statistics=False)
+            assert 'This is a value' in value
+            assert str(now) in value
+            exec_calls = [x for x in mock_pipeline.method_calls if x[0] == 'execute']
+            eq_(len(mock_pipeline.method_calls), 5)
+            eq_(len(exec_calls), 1)
 
     def test_generate_value_other_creator(self):
         mock_redis = Mock(spec=redis.client.Redis)
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         now = time.time()
-        results = ['0', (None, '0')]
+        results = ['0', (None, None)]
         def side_effect(*args, **kwargs):
             return results.pop()
         
@@ -293,6 +386,34 @@ class TestInvalidFunction(unittest.TestCase):
             invalidate_function(my_func, ['decarg'], u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
             calls = mock_redis.method_calls
             eq_(calls[0][1][0], u'retools:short_term:retools:a_key decarg:\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
+            eq_(calls[0][0], 'hset')
+            eq_(len(calls), 1)
+
+    def test_invalidate_function_with_args_and_no_deco_args(self):
+        def my_func(name): return "Hello %s" % name
+        my_func._region = 'short_term'
+        my_func._namespace = 'retools:a_key '
+        
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_redis.smembers.return_value = set(['1'])
+        
+        invalidate_function = self._makeOne()        
+        with patch('retools.Connection.get_default') as mock:
+            mock.return_value = mock_redis
+            CR = self._makeCR()
+            CR.add_region('short_term', expires=600)
+            
+            invalidate_function(my_func, None, 'fred')
+            calls = mock_redis.method_calls
+            eq_(calls[0][1][0], 'retools:short_term:retools:a_key :fred')
+            eq_(calls[0][0], 'hset')
+            eq_(len(calls), 1)
+            
+            # And a unicode key
+            mock_redis.reset_mock()
+            invalidate_function(my_func, None, u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
+            calls = mock_redis.method_calls
+            eq_(calls[0][1][0], u'retools:short_term:retools:a_key :\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
             eq_(calls[0][0], 'hset')
             eq_(len(calls), 1)
 
