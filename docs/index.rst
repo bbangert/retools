@@ -1,14 +1,39 @@
-retools
-=======
+.. _index:
 
-A collection of Redis 
+================================
+retools - A Python Redis Toolset
+================================
+
+`retools` is a concise set of well-tested extensible Python Redis tools.
+
+- Caching
+    - Hit/Miss Statistics
+    - Regions for common expiration periods and invalidating batches of
+      functions at once.
+    - Write-lock to prevent the `Thundering Herd`_
+- Lock
+    - Python context-manager with lock timeouts and retries
+- Well Tested
+    - 100% statement coverage
+    - 100% condition coverage (via instrumental_)
+
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
-   
-   
+
+
+Reference Material
+==================
+
+Reference material includes documentation for every `retools` API.
+
+.. toctree::
+   :maxdepth: 1
+
+   api
+
 
 Indices and tables
 ==================
@@ -17,3 +42,6 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
+
+.. _`Thundering Herd`: http://en.wikipedia.org/wiki/Thundering_herd_problem
+.. `_instrumental`: http://pypi.python.org/pypi/instrumental

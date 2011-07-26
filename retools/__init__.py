@@ -1,11 +1,14 @@
 """retools
 
-This module holds a default Redis instance, which can be
-configured process-wide::
-    
+This module holds a default Redis instance, which can be configured
+process-wide::
+
     from retools import Connection
-    
+
     Connection.set_default(host='127.0.0.1', db=0, **kwargs)
+
+Alternatively, many parts of retools accept Redis instances that may be passed
+directly.
 
 """
 from redis import Redis

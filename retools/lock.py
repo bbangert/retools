@@ -41,7 +41,9 @@ class Lock(object):
         self.key = key
         self.timeout = timeout
         self.expires = expires
-        self.redis = redis or Connection.get_default()
+        if not redis:
+            redis = Connection.get_default()
+        self.redis = redis
         self.start_time = time.time()
 
     def __enter__(self):
