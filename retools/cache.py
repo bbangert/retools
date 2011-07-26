@@ -273,14 +273,12 @@ def invalidate_region(region):
     CacheRegion.invalidate(region)
 
 
-def invalidate_callable(callable, deco_args=None, *args):
+def invalidate_callable(callable, *args):
     """Invalidate the cache for a callable
     
     :param callable: The callable that was cached
     :type callable: callable object
-    :param deco_args: Arguments to differentiate callable name
-    :type deco_args: list
-    :param \*args: Arguments the decorator + function was called with that
+    :param \*args: Arguments the function was called with that
                    should be invalidated. If the args is just the
                    differentiator for the function, or not present, then all
                    values for the function will be invalidated.
@@ -296,17 +294,15 @@ def invalidate_callable(callable, deco_args=None, *args):
             # look them up and return them
         
         # To clear local_search for search_term = 'fred'
-        invalidate_function(local_search, 'small_engine', 'fred')
+        invalidate_function(local_search, 'fred')
         
         # To clear all cached variations of the local_search function
-        invalidate_function(local_search, 'small_engine')
+        invalidate_function(local_search)
         
         # To clear out lookup_folks
         invalidate_function(lookup_folks)
     
     """
-    if deco_args is None:
-        deco_args = []
     redis = Connection.get_default()
     region = callable._region
     namespace = callable._namespace

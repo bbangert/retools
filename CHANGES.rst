@@ -26,6 +26,10 @@ Incompatibilities
   Redis that has no easy removal other than .keys() which should not be run
   in production environments.
 
+- Removed deco_args from invalidate_callable (invalidate_function) as its
+  not actually needed since the namespace is already on the callable to
+  invalidate.
+
 
 0.1 (07/08/2011)
 ================

@@ -356,7 +356,7 @@ class TestInvalidFunction(unittest.TestCase):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
-            invalidate_function(my_func, [])
+            invalidate_function(my_func)
             calls = mock_redis.method_calls
             eq_(calls[0][1], ('retools:short_term:retools:a_key:keys',))
             eq_(len(calls), 2)
@@ -375,7 +375,7 @@ class TestInvalidFunction(unittest.TestCase):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
-            invalidate_function(my_func, ['decarg'], 'fred')
+            invalidate_function(my_func, 'fred')
             calls = mock_redis.method_calls
             eq_(calls[0][1][0], 'retools:short_term:retools:a_key decarg:fred')
             eq_(calls[0][0], 'hset')
@@ -383,37 +383,9 @@ class TestInvalidFunction(unittest.TestCase):
             
             # And a unicode key
             mock_redis.reset_mock()
-            invalidate_function(my_func, ['decarg'], u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
+            invalidate_function(my_func,  u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
             calls = mock_redis.method_calls
             eq_(calls[0][1][0], u'retools:short_term:retools:a_key decarg:\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
-            eq_(calls[0][0], 'hset')
-            eq_(len(calls), 1)
-
-    def test_invalidate_function_with_args_and_no_deco_args(self):
-        def my_func(name): return "Hello %s" % name
-        my_func._region = 'short_term'
-        my_func._namespace = 'retools:a_key '
-        
-        mock_redis = Mock(spec=redis.client.Redis)
-        mock_redis.smembers.return_value = set(['1'])
-        
-        invalidate_function = self._makeOne()        
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
-            CR = self._makeCR()
-            CR.add_region('short_term', expires=600)
-            
-            invalidate_function(my_func, None, 'fred')
-            calls = mock_redis.method_calls
-            eq_(calls[0][1][0], 'retools:short_term:retools:a_key :fred')
-            eq_(calls[0][0], 'hset')
-            eq_(len(calls), 1)
-            
-            # And a unicode key
-            mock_redis.reset_mock()
-            invalidate_function(my_func, None, u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
-            calls = mock_redis.method_calls
-            eq_(calls[0][1][0], u'retools:short_term:retools:a_key :\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
             eq_(calls[0][0], 'hset')
             eq_(len(calls), 1)
 
