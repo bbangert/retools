@@ -20,15 +20,16 @@ class Connection(object):
     # For testing
     Redis = Redis
     
-    redis = None
+    def __init__(self, host='localhost', port=6379, db=0, password=None):
+        self._redis_params = dict(host=host, port=port, db=db,
+                                  password=password)
+        self._redis = None
     
-    @classmethod
-    def set_default(cls, host='localhost', port=6379, db=0, password=None):
-        cls.redis = cls.Redis(host=host, port=port, db=db,
-                                 password=password)
+    @property
+    def redis(self):
+        if not self._redis:
+            self._redis = Connection.Redis(**self._redis_params)
+        return self._redis
 
-    @classmethod
-    def get_default(cls):
-        if not cls.redis:
-            cls.redis = cls.Redis()
-        return cls.redis
+
+global_connection = Connection()

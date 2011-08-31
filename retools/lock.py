@@ -14,7 +14,7 @@ we shouldn't be deleting their lock.
 
 import time
 
-from retools import Connection
+from retools import global_connection
 
 
 class Lock(object):
@@ -42,7 +42,7 @@ class Lock(object):
         self.timeout = timeout
         self.expires = expires
         if not redis:
-            redis = Connection.get_default()
+            redis = global_connection.redis
         self.redis = redis
         self.start_time = time.time()
 

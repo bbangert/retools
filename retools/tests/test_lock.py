@@ -18,10 +18,23 @@ class TestLock(unittest.TestCase):
         return LockTimeout
     
     def test_nocontention(self):
-        mock = Mock()
         mock_redis = Mock(spec=redis.Redis)
+        @patch('retools.global_connection._redis', mock_redis)
+        def test_it():
+            lock = self._makeOne()
+            with lock('somekey'):
+                val = 2 + 4
+        test_it()
+        method_names = [x[0] for x in mock_redis.method_calls]
+        eq_(method_names[0], 'setnx')
+        eq_(method_names[1], 'delete')
+        eq_(len(method_names), 2)
+    
+    def test_using_mock_Redis(self):
+        mock_redis = Mock(spec=redis.Redis)
+        mock = Mock()
         mock.return_value = mock_redis
-        @patch('retools.Connection.get_default', mock)
+        @patch('retools.Connection.Redis', mock)
         def test_it():
             lock = self._makeOne()
             with lock('somekey'):
@@ -33,14 +46,12 @@ class TestLock(unittest.TestCase):
         eq_(len(method_names), 2)
     
     def test_nocontention_and_no_lock_delete(self):
-        mock = Mock()
         mock_redis = Mock(spec=redis.Redis)
-        mock.return_value = mock_redis
         mock_time = Mock()
         vals = [35, 0, 0, 0]
         mock_time.side_effect = lambda: vals.pop()
         
-        @patch('retools.Connection.get_default', mock)
+        @patch('retools.global_connection._redis', mock_redis)
         @patch('time.time', mock_time)
         def test_it():
             lock = self._makeOne()
@@ -52,9 +63,7 @@ class TestLock(unittest.TestCase):
         assert 'delete' not in method_names
 
     def test_contention_and_someone_else_replacing_timeout(self):
-        mock = Mock()
         mock_redis = Mock(spec=redis.Redis)
-        mock.return_value = mock_redis
         mock_time = Mock()
         vals = [35, 0, 0, 0]
         mock_time.side_effect = lambda: vals.pop()
@@ -63,7 +72,7 @@ class TestLock(unittest.TestCase):
         timeout = self._lockException()
         
         @raises(timeout)
-        @patch('retools.Connection.get_default', mock)
+        @patch('retools.global_connection._redis', mock_redis)
         @patch('time.time', mock_time)
         @patch('time.sleep', Mock())
         def test_it():
@@ -75,13 +84,11 @@ class TestLock(unittest.TestCase):
         eq_(len(method_names), 2)
     
     def test_contention(self):
-        mock = Mock()
         mock_redis = Mock(spec=redis.Redis)
-        mock.return_value = mock_redis
         mock_redis.get.return_value = 150
         mock_redis.getset.return_value = 150
         mock_redis.setnx.return_value = False
-        @patch('retools.Connection.get_default', mock)
+        @patch('retools.global_connection._redis', mock_redis)
         def test_it():
             lock = self._makeOne()
             with lock('somekey'):
@@ -93,18 +100,16 @@ class TestLock(unittest.TestCase):
         eq_(get[1][0], 'somekey')
     
     def test_timeout_current_val_is_newer(self):
-        mock = Mock()
         mock_redis = Mock(spec=redis.Redis)
         mock_redis.setnx.return_value = False
         mock_redis.get.return_value = time.time() + 200
-        mock.return_value = mock_redis
         timeout = self._lockException()
         mock_time = Mock()
         mock_time.return_value = 0
         
         array = []
         @raises(timeout)
-        @patch('retools.Connection.get_default', mock)
+        @patch('retools.global_connection._redis', mock_redis)
         @patch('time.sleep', mock_time)
         def test_it():
             lock = self._makeOne()
@@ -114,19 +119,17 @@ class TestLock(unittest.TestCase):
         eq_(len(array), 0)
 
     def test_timeout_no_current_value_and_mock_redis(self):
-        mock = Mock()
         mock_redis = Mock(spec=redis.Redis)
         mock_redis.setnx.return_value = False
         mock_redis.get.return_value = 150
         mock_redis.getset.return_value = False
-        mock.return_value = mock_redis
         timeout = self._lockException()
         mock_time = Mock()
         mock_time.return_value = 0
         
         array = []
         @raises(timeout)
-        @patch('retools.Connection.get_default', mock)
+        @patch('retools.global_connection._redis', mock_redis)
         @patch('time.sleep', mock_time)
         def test_it():
             lock = self._makeOne()

@@ -38,7 +38,7 @@ class TestCacheRegion(unittest.TestCase):
         eq_(CR.regions['short_term']['expires'], 60)
     
     def test_generate_value(self):
-        mock_redis = Mock(spec=redis.client.Redis)
+        mock_redis = Mock(spec=redis.Redis)
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         results = ['0', (None, '0')]
         def side_effect(*args, **kwargs):
@@ -47,8 +47,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {}
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -70,8 +69,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {}
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)            
             value = CR.load('short_term', 'my_func', '1 2 3', regenerate=False)
@@ -90,8 +88,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {'created': '1', 'value': "S'This is a value: 1311702429.28'\n."}
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             def a_func():
@@ -114,8 +111,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {}
         mock_redis.exists.return_value = False
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             def a_func(): return "This is a value: %s" % time.time()
@@ -136,8 +132,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {}
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -163,8 +158,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {'created': now, 'value': cPickle.dumps("This is a NEW value")}
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -180,8 +174,7 @@ class TestCacheRegion(unittest.TestCase):
         now = time.time()
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.return_value = ({'created': now, 'value': cPickle.dumps("This is a value")}, '0')
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -206,8 +199,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.exists.return_value = True
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -232,8 +224,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {}
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -255,8 +246,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.return_value = (None, '0')
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             
@@ -281,8 +271,7 @@ class TestInvalidateRegion(unittest.TestCase):
         mock_redis.smembers.return_value = set([])
         
         invalidate_region = self._makeOne()
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
@@ -298,8 +287,7 @@ class TestInvalidateRegion(unittest.TestCase):
         mock_redis.smembers.side_effect = side_effect
         
         invalidate_region = self._makeOne()
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
@@ -318,8 +306,7 @@ class TestInvalidateRegion(unittest.TestCase):
         mock_redis.exists.return_value = False
         
         invalidate_region = self._makeOne()
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
@@ -351,8 +338,7 @@ class TestInvalidFunction(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         
         invalidate_function = self._makeOne()
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
@@ -370,8 +356,7 @@ class TestInvalidFunction(unittest.TestCase):
         mock_redis.smembers.return_value = set(['1'])
         
         invalidate_function = self._makeOne()        
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeCR()
             CR.add_region('short_term', expires=600)
             
@@ -425,8 +410,7 @@ class TestCacheDecorator(unittest.TestCase):
         def dummy_func():
             return "This is a value: %s" % time.time()
         
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             decorated = self._decorateFunc(dummy_func, 'short_term')        
@@ -443,8 +427,7 @@ class TestCacheDecorator(unittest.TestCase):
         def dummy_func():
             return "This is a value: %s" % time.time()
         
-        with patch('retools.Connection.get_default') as mock:
-            mock.return_value = mock_redis
+        with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
             CR.enabled = False
@@ -512,8 +495,7 @@ class TestCacheDecorator(unittest.TestCase):
         
         
         for key in keys:
-            with patch('retools.Connection.get_default') as mock:
-                mock.return_value = mock_redis
+            with patch('retools.global_connection._redis', mock_redis):
                 CR = self._makeOne()
                 CR.add_region('short_term', 60)
                 decorated = self._decorateFunc(dummy_func, 'short_term')        
@@ -525,8 +507,7 @@ class TestCacheDecorator(unittest.TestCase):
             results.extend(['0', (None, '0')])
 
         for key in keys:
-            with patch('retools.Connection.get_default') as mock:
-                mock.return_value = mock_redis
+            with patch('retools.global_connection._redis', mock_redis):
                 CR = self._makeOne()
                 CR.add_region('short_term', 60)
                 class DummyClass(object):

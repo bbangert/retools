@@ -23,7 +23,7 @@ import cPickle
 import time
 from datetime import date
 
-from retools import Connection
+from retools import global_connection
 from retools.exc import CacheConfigurationError
 from retools.lock import Lock
 from retools.lock import LockTimeout
@@ -129,7 +129,7 @@ class CacheRegion(object):
         :type region: string
         
         """
-        redis = Connection.get_default()
+        redis = global_connection.redis
         namespaces = redis.smembers('retools:%s:namespaces' % region)
         if not namespaces:
             return None
@@ -181,7 +181,7 @@ class CacheRegion(object):
         """
         if statistics is None:
             statistics = cls.statistics
-        redis = Connection.get_default()
+        redis = global_connection.redis
         now = time.time()
         region_settings = cls.regions[region]
         expires = region_settings['expires']
@@ -303,7 +303,7 @@ def invalidate_callable(callable, *args):
         invalidate_function(lookup_folks)
     
     """
-    redis = Connection.get_default()
+    redis = global_connection.redis
     region = callable._region
     namespace = callable._namespace
     
@@ -328,7 +328,7 @@ def invalidate_callable(callable, *args):
     return None
 invalidate_function = invalidate_callable
 
-def cache_region(region, *deco_args):
+def cache_region(region, *deco_args, **kwargs):
     """Decorate a function such that its return result is cached,
     using a "region" to indicate the cache arguments.
 
@@ -391,6 +391,7 @@ def cache_region(region, *deco_args):
     def decorate(func):
         namespace = func_namespace(func, deco_args)
         skip_self = has_self_arg(func)
+        regenerate = kwargs.get('regenerate', True)
         def cached(*args):
             if region not in CacheRegion.regions:
                 raise CacheConfigurationError(
@@ -410,7 +411,8 @@ def cache_region(region, *deco_args):
                     cache_key = " ".join(map(unicode, args))
             def go():
                 return func(*args)
-            return CacheRegion.load(region, namespace, cache_key, callable=go)
+            return CacheRegion.load(region, namespace, cache_key,
+                                    regenerate=regenerate, callable=go)
         cached._region = region
         cached._namespace = namespace
         return cached

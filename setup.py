@@ -1,4 +1,4 @@
-__version__ = '0.1'
+__version__ = '0.2'
 
 import os
 
@@ -27,9 +27,10 @@ setup(name='retools',
       zip_safe=False,
       tests_require = ['pkginfo', 'Mock>=0.7', 'nose'],
       install_requires=[
-          # "setproctitle>=1.1.2",
+          "setproctitle>=1.1.2",
           "redis>=2.4.5",
-          # "venusian>=0.9",
-          # "cmdln>=1.1",
+          "blinker>=1.1",
+          "venusian>=0.9",
+          "cmdln>=1.1",
       ],
 )

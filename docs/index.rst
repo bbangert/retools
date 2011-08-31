@@ -11,17 +11,20 @@ retools - A Python Redis Toolset
     - Regions for common expiration periods and invalidating batches of
       functions at once.
     - Write-lock to prevent the `Thundering Herd`_
-- Lock
+- Distributed Locking
     - Python context-manager with lock timeouts and retries
 - Well Tested
     - 100% statement coverage
     - 100% condition coverage (via instrumental_)
 
 
-Contents:
+Using Retools
+=============
 
 .. toctree::
    :maxdepth: 2
+   
+   caching
 
 
 Reference Material
@@ -44,4 +47,4 @@ Indices and tables
 
 
 .. _`Thundering Herd`: http://en.wikipedia.org/wiki/Thundering_herd_problem
-.. `_instrumental`: http://pypi.python.org/pypi/instrumental
+.. _instrumental: http://pypi.python.org/pypi/instrumental
