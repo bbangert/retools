@@ -29,8 +29,11 @@ be enqueued.
 import os
 import signal
 import socket
+import subprocess
+import sys
 import time
 import uuid
+from datetime import datetime
 
 try:
     import json
@@ -44,7 +47,6 @@ from setproctitle import setproctitle
 from retools import global_connection
 from retools.exc import UnregisteredJob
 from retools.exc import ConfigurationError
-from retools.util import reify
 from retools.util import with_nested_contexts
 
 # Global to indicate the current job being processed
@@ -334,11 +336,6 @@ class Job(object):
         self.queue_name = queue_name
         self.func = global_queue_manager.registered_jobs[payload['job']]
     
-    def clear(self):
-        """Clears the job from the current_job"""
-        global current_job
-        current_job = None
-    
     def perform(self):
         """Runs the job calling all the job signals as appropriate"""
         job_prerun.send(self.func, job=self)
@@ -385,6 +382,7 @@ class Worker(object):
     
     @property
     def worker_id(self):
+        """Returns this workers id based on hostname, pid, queues"""
         return '%s:%s:%s' % (socket.gethostname(), os.getpid(), ','.join(self.queues))
     
     def work(self, interval=5, blocking=False):
@@ -416,22 +414,22 @@ class Worker(object):
                     self.child_id = os.fork()
                     if self.child_id:
                         self.set_proc_title("Forked %s at %s" % (
-                            self.child_id, time.time()))
+                            self.child_id, datetime.now()))
                         os.wait()
                     else:
                         self.set_proc_title("Processing %s since %s" % (
-                            self.job.queue_name, time.time()))
+                            self.job.queue_name, datetime.now()))
                         self.perform()
                         sys.exit()
                     self.done_working()
-                    self.job.clear()
                     self.child_id = None
                     self.job = None
                 else:
-                    if self.paused and not blocking:
+                    if self.paused:
                         self.set_proc_title("Paused")
-                    else:
+                    elif not blocking:
                         self.set_proc_title("Waiting for %s" % ','.join(self.queues))
+                        time.sleep(interval)
         finally:
             self.unregister_worker()
             worker_shutdown.send(self)
@@ -461,22 +459,29 @@ class Worker(object):
         setproctitle('retools: ' + title)
     
     def register_worker(self):
-        self.redis.sadd("retools:workers", self.child_id)
-        self.redis.set("retools:worker:%s:started" % self.child_id, time.time())
+        """Register this worker with Redis"""
+        pipeline = self.redis.pipeline()
+        pipeline.sadd("retools:workers", self.worker_id)
+        pipeline.set("retools:worker:%s:started" % self.worker_id, time.time())
+        pipeline.execute()
 
-    def unregister_worker(self):
-        self.redis.srem("retools:workers", self.child_id)
-        self.redis.delete("retools:worker:%s" % self.child_id)
-        self.redis.delete("retools:worker:%s:started" % self.child_id)
+    def unregister_worker(self, worker_id=None):
+        """Unregister this worker with Redis"""
+        worker_id = worker_id or self.worker_id
+        pipeline = self.redis.pipeline()
+        pipeline.srem("retools:workers", worker_id)
+        pipeline.delete("retools:worker:%s" % worker_id)
+        pipeline.delete("retools:worker:%s:started" % worker_id)
+        pipeline.execute()
     
     def startup(self):
         """Runs basic startup tasks"""
         self.register_signal_handlers()
         self.prune_dead_workers()
-        worker_startup.send(self)
         self.register_worker()
+        worker_startup.send(self)
     
-    def shutdown(self):
+    def trigger_shutdown(self):
         """Graceful shutdown of the worker"""
         self.shutdown = True
     
@@ -500,13 +505,20 @@ class Worker(object):
     
     def prune_dead_workers(self):
         """Prune dead workers from Redis"""
-    
-    
+        all_workers = self.redis.smembers("retools:workers")
+        known_workers = self.worker_pids()
+        hostname = socket.gethostname()
+        for worker in all_workers:
+            host, pid, queues = worker.split(':')
+            if host != hostname or pid in known_workers:
+                continue
+            self.unregister_worker(worker)
     
     def register_signal_handlers(self):
-        signal.signal(signal.SIGTERM, self.shutdown)
-        signal.signal(signal.SIGINT, self.shutdown)
-        signal.signal(signal.SIGQUIT, self.shutdown)
+        """Setup all the signal handlers"""
+        signal.signal(signal.SIGTERM, self.immediate_shutdown)
+        signal.signal(signal.SIGINT, self.immediate_shutdown)
+        signal.signal(signal.SIGQUIT, self.trigger_shutdown)
         signal.signal(signal.SIGUSR1, self.kill_child)
         signal.signal(signal.SIGUSR2, self.pause_processing)
         signal.signal(signal.SIGCONT, self.resume_processing)
@@ -526,7 +538,13 @@ class Worker(object):
 
     def worker_pids(self):
         """Returns a list of all the worker processes"""
+        ps = subprocess.Popen("ps -U 0 -A | grep 'retools:'", shell=True, stdout=subprocess.PIPE)
+        data = ps.stdout.read()
+        ps.stdout.close()
+        ps.wait()
+        return [x.split()[0] for x in data.split('\n') if x]
     
     def perform(self):
+        """Run the job and call the appropriate signal handlers"""
         worker_postfork.send(self, job=self.job)
         self.job.perform()

@@ -47,23 +47,3 @@ def with_nested_contexts(context_managers, func, args, kwargs):
         ctx_manager = context_managers[0]
         with ctx_manager(func, *args, **kwargs):
             return with_nested_contexts(context_managers[1:], func, args, kwargs)
-
-class reify(object): #pragma: no cover
-    """ Put the result of a method which uses this (non-data)
-    descriptor decorator in the instance dict after the first call,
-    effectively replacing the decorator with an instance variable."""
-
-    def __init__(self, wrapped):
-        self.wrapped = wrapped
-        try:
-            self.__doc__ = wrapped.__doc__
-        except: # pragma: no cover
-            pass
-
-    def __get__(self, inst, objtype=None):
-        if inst is None:
-            return self
-        val = self.wrapped(inst)
-        setattr(inst, self.wrapped.__name__, val)
-        return val
-
