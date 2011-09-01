@@ -3,9 +3,10 @@
 This module holds a default Redis instance, which can be configured
 process-wide::
 
-    from retools import Connection
-
-    Connection.set_default(host='127.0.0.1', db=0, **kwargs)
+    from redis import Redis
+    from retools import global_connection
+    
+    global_connection.redis = Redis(host='192.168.1.1', db=2)
 
 Alternatively, many parts of retools accept Redis instances that may be passed
 directly.
@@ -17,19 +18,26 @@ __all__ = ['Connection']
 
 
 class Connection(object):
-    # For testing
-    Redis = Redis
+    """The default Redis Connection
     
-    def __init__(self, host='localhost', port=6379, db=0, password=None):
-        self._redis_params = dict(host=host, port=port, db=db,
-                                  password=password)
+    A :obj:`retools.global_connection` object is created using this
+    during import. The ``.redis`` property can be set on it to change
+    the connection used globally by retools, or individual ``retools``
+    functions can be called with a custom ``Redis`` object.
+
+    """
+    def __init__(self):
         self._redis = None
     
-    @property
-    def redis(self):
+    def _get_redis(self):
         if not self._redis:
-            self._redis = Connection.Redis(**self._redis_params)
+            self._redis = Redis()
         return self._redis
+    
+    def _set_redis(self, conn):
+        self._redis = conn
+    
+    redis = property(_get_redis, _set_redis)
 
 
 global_connection = Connection()

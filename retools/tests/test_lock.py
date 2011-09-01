@@ -16,6 +16,24 @@ class TestLock(unittest.TestCase):
     def _lockException(self):
         from retools.lock import LockTimeout
         return LockTimeout
+
+    def test_redis_Sub(self):
+        mock_redis = Mock(spec=redis.Redis)
+        import retools
+        old_conn = retools.global_connection.redis
+        try:
+            retools.global_connection.redis = mock_redis
+            def test_it():
+                lock = self._makeOne()
+                with lock('somekey'):
+                    val = 2 + 4
+            test_it()
+            method_names = [x[0] for x in mock_redis.method_calls]
+            eq_(method_names[0], 'setnx')
+            eq_(method_names[1], 'delete')
+            eq_(len(method_names), 2)
+        finally:
+            retools.global_connection.redis = old_conn
     
     def test_nocontention(self):
         mock_redis = Mock(spec=redis.Redis)
@@ -29,22 +47,7 @@ class TestLock(unittest.TestCase):
         eq_(method_names[0], 'setnx')
         eq_(method_names[1], 'delete')
         eq_(len(method_names), 2)
-    
-    def test_using_mock_Redis(self):
-        mock_redis = Mock(spec=redis.Redis)
-        mock = Mock()
-        mock.return_value = mock_redis
-        @patch('retools.Connection.Redis', mock)
-        def test_it():
-            lock = self._makeOne()
-            with lock('somekey'):
-                val = 2 + 4
-        test_it()
-        method_names = [x[0] for x in mock_redis.method_calls]
-        eq_(method_names[0], 'setnx')
-        eq_(method_names[1], 'delete')
-        eq_(len(method_names), 2)
-    
+        
     def test_nocontention_and_no_lock_delete(self):
         mock_redis = Mock(spec=redis.Redis)
         mock_time = Mock()

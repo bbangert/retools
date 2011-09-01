@@ -20,7 +20,7 @@ def has_self_arg(func):
     return inspect.getargspec(func)[0] and inspect.getargspec(func)[0][0] in ('self', 'cls')
 
 
-def with_nested_contexts(context_managers, func, kwargs):
+def with_nested_contexts(context_managers, func, args, kwargs):
     """Nested context manager calling
     
     Given a function, and keyword arguments to call it with, it will
@@ -32,8 +32,8 @@ def with_nested_contexts(context_managers, func, kwargs):
     
     Example::
         
-        with ContextA(func, **kwargs):
-            with ContextB(func, **kwargs):
+        with ContextA(func, args, **kwargs):
+            with ContextB(func, args, **kwargs):
                 return func(**kwargs)
         
         # is equivilant to
@@ -45,5 +45,25 @@ def with_nested_contexts(context_managers, func, kwargs):
         return func(**kwargs)
     else:
         ctx_manager = context_managers[0]
-        with ctx_manager(func, **kwargs):
-            return with_nested_contexts(context_managers[1:], func, kwargs)
+        with ctx_manager(func, *args, **kwargs):
+            return with_nested_contexts(context_managers[1:], func, args, kwargs)
+
+class reify(object): #pragma: no cover
+    """ Put the result of a method which uses this (non-data)
+    descriptor decorator in the instance dict after the first call,
+    effectively replacing the decorator with an instance variable."""
+
+    def __init__(self, wrapped):
+        self.wrapped = wrapped
+        try:
+            self.__doc__ = wrapped.__doc__
+        except: # pragma: no cover
+            pass
+
+    def __get__(self, inst, objtype=None):
+        if inst is None:
+            return self
+        val = self.wrapped(inst)
+        setattr(inst, self.wrapped.__name__, val)
+        return val
+

@@ -15,7 +15,21 @@ Features
 Internals
 ---------
 
+- Heavily refactored ``Connection`` to not be a class singleton, instead
+  a global_connection instance is created and used by default.
 - Increased conditional coverage to 100% (via instrumental).
+
+Backwards Incompatibilities
+---------------------------
+
+- Changing the default global Redis connection has changed semantics, instead
+  of using ``Connection.set_default``, you should set the global_connection's
+  redis property directly::
+
+      import redis
+      from retools import global_connection
+      
+      global_connection.redis = redis.Redis(host='myhost')
 
 
 Incompatibilities
