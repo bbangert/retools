@@ -102,7 +102,7 @@ class Event(object):
             events[name] = Signal()
         self.events = events
     
-    def listen(event, handler, *jobs):
+    def listen(event, handler, jobs=None):
         """Bind a handler to an event, optionally for specific senders
         
         :param event: The name of the event to bind for
@@ -111,6 +111,7 @@ class Event(object):
         :param jobs: Job functions that should be bound to this event. When
                      not passed in, the handler will be bound globally
                      to this event for all jobs.
+        :type jobs: list of function objects
         
         """
         if event not in self.events:

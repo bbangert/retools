@@ -8,7 +8,6 @@ Declaring jobs::
     
     # jobs.py
     from retools.queue import job
-    from retools.signals import job_failure
 
     @job
     def default_job():
@@ -18,15 +17,19 @@ Declaring jobs::
     def important(somearg=None):
         # do an important thing
     
-    # Hook up a job_failure handler to the default_job
-    @job_failure.connect_via(default_job)
-    def my_handler(sender, **kwargs):
+
+    def my_event_handler(sender, **kwargs):
         # do something
-    
-    # Hook up a handler for all job failures
-    @job_failure.connect
+
     def save_error(sender, **kwargs):
         # record error
+    
+    def configure_events(event):
+        # Hook up the my_event_handler just for the default_job function
+        event.listen('job_postrun', my_event_handler, jobs=[default_job])
+
+        # Hook up a handler for all job failures
+        event.listen('job_failure', save_error)
 
 
 Running Jobs::
