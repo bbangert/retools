@@ -60,16 +60,9 @@ except ImportError: #pragma: nocover
 from setproctitle import setproctitle
 
 from retools import global_connection
+from retools.event import Event
 from retools.exc import UnregisteredJob
 from retools.exc import ConfigurationError
-from retools.signals import worker_startup
-from retools.signals import worker_shutdown
-from retools.signals import worker_prefork
-from retools.signals import worker_postfork
-from retools.signals import job_prerun
-from retools.signals import job_postrun
-from retools.signals import job_wrapper
-from retools.signals import job_failure
 from retools.util import with_nested_contexts
 
 # Global to indicate the current job being processed
@@ -214,12 +207,14 @@ global_queue_manager = QueueManager()
 
 
 class Job(object):
-    def __init__(self, queue_name, job_payload, redis):
+    def __init__(self, queue_name, job_payload, redis, event):
         """Create a job instance given a JSON job payload
 
         :param job_payload: A JSON string representing a job.
         :param queue_name: The queue this job was pulled off of.
         :param redis: The redis instance used to pull this job.
+        :param event: An :class:`~retools.event.Event` instance used to
+                      dispatch events.
 
         A ``Job`` instance is created when the Worker pulls a
         job payload off the queue. The ``current_job`` global is set
@@ -228,7 +223,8 @@ class Job(object):
         """
         global current_job
         current_job = self
-
+        
+        self.event = event
         self.payload = payload = json.loads(job_payload)
         self.job_id = payload['job_id']
         self.job_name = payload['job']
@@ -240,27 +236,30 @@ class Job(object):
 
     def perform(self):
         """Runs the job calling all the job signals as appropriate"""
-        job_prerun.send(self.func, job=self)
+        event = self.event
+        event['job_prerun'].send(self.func, job=self)
         try:
-            if job_wrapper.has_receivers_for(self.func):
-                handlers = list(job_wrapper.recievers_for(self.func))
+            if event['job_wrapper'].has_receivers_for(self.func):
+                handlers = list(event['job_wrapper'].recievers_for(self.func))
                 result = with_nested_contexts(handlers, self.func, [self], self.kwargs)
             else:
                 result = self.func(**self.kwargs)
-            job_postrun.send(self.func, job=self, result=result)
+            event['job_postrun'].send(self.func, job=self, result=result)
             return True
         except Exception, exc:
-            job_failure.send(self.func, job=self, exc=exc)
+            event['job_failure'].send(self.func, job=self, exc=exc)
             return False
 
 
 class Worker(object):
     """A Worker works on jobs"""
-    def __init__(self, queues, redis=None):
+    def __init__(self, queues, event, redis=None):
         """Create a worker
 
         :param queues: List of queues to process
         :type queues: list
+        :param event: An :class:`~retools.event.Event` instance used to
+                      dispatch events.
         :param redis: Redis instance to use, defaults to the global_connection.
 
         In the event that there is only a single queue in the list
@@ -268,6 +267,7 @@ class Worker(object):
         processing
 
         """
+        self.event = event
         self.redis = redis or global_connection.redis
         if not queues:
             raise ConfigurationError("No queues were configured for this worker")
@@ -314,7 +314,7 @@ class Worker(object):
                 self.set_proc_title("Waiting for %s" % self.queue_names)
                 
                 if not self.paused and self.reserve(interval, blocking):
-                    worker_prefork.send(self, job=self.job)
+                    self.event['worker_prefork'].send(self, job=self.job)
                     self.working_on()
                     self.child_id = os.fork()
                     if self.child_id:
@@ -337,7 +337,7 @@ class Worker(object):
                         time.sleep(interval)
         finally:
             self.unregister_worker()
-            worker_shutdown.send(self)
+            self.event['worker_shutdown'].send(self)
 
     def reserve(self, interval, blocking):
         """Attempts to pull a job off the queue(s)"""
@@ -356,7 +356,7 @@ class Worker(object):
             return False
 
         self.job = Job(queue_name=queue_name, job_payload=job_payload,
-                       redis=self.redis)
+                       redis=self.redis, event=event)
         return True
 
     def set_proc_title(self, title):
@@ -452,7 +452,7 @@ class Worker(object):
 
     def perform(self):
         """Run the job and call the appropriate signal handlers"""
-        worker_postfork.send(self, job=self.job)
+        self.event['worker_postfork'].send(self, job=self.job)
         self.job.perform()
 
 
@@ -470,10 +470,16 @@ def run_worker():
     if len(args) < 2:
         sys.exit("Error: Failed to provide both arguments")
     
-    # Scan the package
-    for mod in args[1].split(','):
-        __import__(mod)
+    # Create the event object
+    event = Event()
     
-    worker = Worker(queues=args[0].split(','))
+    # Scan the package
+    for mod_name in args[1].split(','):
+        mod = __import__(mod_name)
+        configure_events = getattr(mod, 'configure_events', None)
+        if configure_events:
+            configure_events(event)
+    
+    worker = Worker(queues=args[0].split(','), event=event)
     worker.work(interval=options.interval, blocking=options.blocking)
     sys.exit()

@@ -1,6 +1,6 @@
 from blinker import Signal
 
-# Signals
+
 job_prerun = Signal(doc="""\
 Runs in the child process immediately before the job is performed.
 
