@@ -77,8 +77,7 @@ def _decorate_function(func, kwargs):
 
 
 def job(*args, **kwargs):
-    """Register a function with the :class:`~retools.queue.QueueManager`
-    as job
+    """Register a job for this function
 
     :param name: Set the job name manually. By default the job name is the
                  module + function name. I.e. ``retools.queue.job_func``.
