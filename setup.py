@@ -33,4 +33,9 @@ setup(name='retools',
           "venusian>=0.9",
           "cmdln>=1.1",
       ],
+      entry_points="""
+      [console_scripts]
+      retools-worker = retools.queue:run_worker
+      
+      """
 )

@@ -22,6 +22,11 @@ Declaring jobs::
     @job_failure.connect_via(default_job)
     def my_handler(sender, **kwargs):
         # do something
+    
+    # Hook up a handler for all job failures
+    @job_failure.connect
+    def save_error(sender, **kwargs):
+        # record error
 
 
 Running Jobs::
@@ -45,6 +50,7 @@ import sys
 import time
 import uuid
 from datetime import datetime
+from optparse import OptionParser
 
 try:
     import json
@@ -57,6 +63,14 @@ from setproctitle import setproctitle
 from retools import global_connection
 from retools.exc import UnregisteredJob
 from retools.exc import ConfigurationError
+from retools.signals import worker_startup
+from retools.signals import worker_shutdown
+from retools.signals import worker_prefork
+from retools.signals import worker_postfork
+from retools.signals import job_prerun
+from retools.signals import job_postrun
+from retools.signals import job_wrapper
+from retools.signals import job_failure
 from retools.util import with_nested_contexts
 
 # Global to indicate the current job being processed
@@ -202,7 +216,7 @@ global_queue_manager = QueueManager()
 
 
 class Job(object):
-    def __init__(self, queue_name, job_payload, func, redis):
+    def __init__(self, queue_name, job_payload, redis):
         """Create a job instance given a JSON job payload
 
         :param job_payload: A JSON string representing a job.
@@ -255,7 +269,7 @@ class Worker(object):
         processing
 
         """
-        self.redis = redis
+        self.redis = redis or global_connection.redis
         if not queues:
             raise ConfigurationError("No queues were configured for this worker")
         self.queues = ['retools:queue:%s' % x for x in queues]
@@ -266,7 +280,12 @@ class Worker(object):
     @property
     def worker_id(self):
         """Returns this workers id based on hostname, pid, queues"""
-        return '%s:%s:%s' % (socket.gethostname(), os.getpid(), ','.join(self.queues))
+        return '%s:%s:%s' % (socket.gethostname(), os.getpid(), self.queue_names)
+    
+    @property
+    def queue_names(self):
+        names = [x.lstrip('retools:queue:') for x in self.queues]
+        return ','.join(names)
 
     def work(self, interval=5, blocking=False):
         """Work on jobs
@@ -311,7 +330,7 @@ class Worker(object):
                     if self.paused:
                         self.set_proc_title("Paused")
                     elif not blocking:
-                        self.set_proc_title("Waiting for %s" % ','.join(self.queues))
+                        self.set_proc_title("Waiting for %s" % self.queue_names)
                         time.sleep(interval)
         finally:
             self.unregister_worker()
@@ -368,7 +387,7 @@ class Worker(object):
         """Graceful shutdown of the worker"""
         self.shutdown = True
 
-    def immediate_shutdown(self):
+    def immediate_shutdown(self, *args):
         """Immediately shutdown the worker, kill child process if needed"""
         self.shutdown = True
         self.kill_child()
@@ -392,6 +411,7 @@ class Worker(object):
         known_workers = self.worker_pids()
         hostname = socket.gethostname()
         for worker in all_workers:
+            print worker
             host, pid, queues = worker.split(':')
             if host != hostname or pid in known_workers:
                 continue
@@ -432,3 +452,14 @@ class Worker(object):
         """Run the job and call the appropriate signal handlers"""
         worker_postfork.send(self, job=self.job)
         self.job.perform()
+
+
+def run_worker():
+    usage = "usage: %prog queues packages_to_scan"
+    parser = OptionParser(usage=usage)
+    parser.add_option("--interval", dest="interval", type="int", default=5,
+                      help="Polling interval")
+    (options, args) = parser.parse_args()
+    worker = Worker(queues=args[0].split(','))
+    worker.work(interval=options.interval)
+    sys.exit()
