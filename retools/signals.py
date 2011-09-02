@@ -39,9 +39,9 @@ Signal handler will be called with the job function, the
 job_failure = Signal(doc="""\
 Runs in the child process when a job throws an exception
 
-Each object registered for this signal will be called with the exception
-details. These should not raise an exception. After they are run, the original
-exception is raised again.
+Signal handler will be called with the job function, the 
+:class:`~retools.queue.Job` instance, and the exception object. The signal
+handler **should not raise an exception**.
 """)
 
 worker_startup = Signal(doc="""\

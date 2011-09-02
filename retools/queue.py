@@ -234,6 +234,7 @@ class Job(object):
         self.payload = payload = json.loads(job_payload)
         self.job_id = payload['job_id']
         self.job_name = payload['job']
+        self.queue_name = queue_name
         self.kwargs = payload['kwargs']
         self.dec_kwargs = payload['dec_kwargs']
         self.redis = redis
@@ -251,7 +252,7 @@ class Job(object):
             job_postrun.send(self.func, job=self, result=result)
             return True
         except Exception, exc:
-            job_failure.send(self.func, exc=exc)
+            job_failure.send(self.func, job=self, exc=exc)
             return False
 
 
@@ -310,6 +311,10 @@ class Worker(object):
             while 1:
                 if self.shutdown:
                     break
+                
+                # Set this first since reserve may block for awhile
+                self.set_proc_title("Waiting for %s" % self.queue_names)
+                
                 if not self.paused and self.reserve(interval, blocking):
                     worker_prefork.send(self, job=self.job)
                     self.working_on()
@@ -383,7 +388,7 @@ class Worker(object):
         self.register_worker()
         worker_startup.send(self)
 
-    def trigger_shutdown(self):
+    def trigger_shutdown(self, *args):
         """Graceful shutdown of the worker"""
         self.shutdown = True
 
@@ -392,16 +397,16 @@ class Worker(object):
         self.shutdown = True
         self.kill_child()
 
-    def kill_child(self):
+    def kill_child(self, *args):
         """Kill the child process immediately"""
         if self.child_id:
             os.kill(self.child_id, signal.SIGTERM)
 
-    def pause_processing(self):
+    def pause_processing(self, *args):
         """Cease pulling jobs off the queue for processing"""
         self.paused = True
 
-    def resume_processing(self):
+    def resume_processing(self, *args):
         """Resume pulling jobs for processing off the queue"""
         self.paused = False
 
@@ -411,7 +416,6 @@ class Worker(object):
         known_workers = self.worker_pids()
         hostname = socket.gethostname()
         for worker in all_workers:
-            print worker
             host, pid, queues = worker.split(':')
             if host != hostname or pid in known_workers:
                 continue
@@ -459,7 +463,20 @@ def run_worker():
     parser = OptionParser(usage=usage)
     parser.add_option("--interval", dest="interval", type="int", default=5,
                       help="Polling interval")
+    parser.add_option("-b", dest="blocking", action="store_true", default=False,
+                      help="Whether to use blocking queue semantics")
     (options, args) = parser.parse_args()
+    
+    if len(args) < 1:
+        sys.exit("Error: Failed to provide queues or packages_to_scan args")
+    if len(args) < 2:
+        sys.exit("Error: Failed to provide both arguments")
+    
+    # Scan the package
+    package_obj = __import__(args[1])
+    scanner = venusian.Scanner()
+    scanner.scan(package_obj)
+    
     worker = Worker(queues=args[0].split(','))
-    worker.work(interval=options.interval)
+    worker.work(interval=options.interval, blocking=options.blocking)
     sys.exit()
