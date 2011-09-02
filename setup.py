@@ -30,7 +30,6 @@ setup(name='retools',
           "setproctitle>=1.1.2",
           "redis>=2.4.5",
           "blinker>=1.1",
-          "venusian>=0.9",
           "cmdln>=1.1",
       ],
       entry_points="""

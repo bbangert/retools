@@ -57,7 +57,6 @@ try:
 except ImportError: #pragma: nocover
     import simplejson as json
 
-import venusian
 from setproctitle import setproctitle
 
 from retools import global_connection
@@ -141,8 +140,8 @@ class QueueManager(object):
         self.default_queue_name = default_queue_name
         self.redis = redis or global_connection.redis
 
-    def scan(self, package_name):
-        """Scan a package/module for jobs to register with the
+    def scan(self, *modules):
+        """Scan modules for jobs to register with the
         :class:`~retools.queue.QueueManager`
 
         This must be called before jobs can be enqueued.
@@ -151,9 +150,8 @@ class QueueManager(object):
                              'mypackage.subpackage'
 
         """
-        package_obj = __import__(package_name)
-        scanner = venusian.Scanner(queue_manager=self)
-        scanner.scan(package_obj)
+        for mod in modules:
+            __import__(mod)
 
     def enqueue(self, job, **kwargs):
         """Enqueue a job
@@ -473,9 +471,8 @@ def run_worker():
         sys.exit("Error: Failed to provide both arguments")
     
     # Scan the package
-    package_obj = __import__(args[1])
-    scanner = venusian.Scanner()
-    scanner.scan(package_obj)
+    for mod in args[1].split(','):
+        __import__(mod)
     
     worker = Worker(queues=args[0].split(','))
     worker.work(interval=options.interval, blocking=options.blocking)
