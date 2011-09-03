@@ -7,13 +7,9 @@ to be run.
 Declaring jobs::
     
     # jobs.py
-    from retools.queue import job
-
-    @job
     def default_job():
         # do some basic thing
 
-    @job(queue_name='critical')
     def important(somearg=None):
         # do an important thing
     
