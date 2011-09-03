@@ -38,8 +38,7 @@ Running Jobs::
     from retools.queue import QueueManager
     
     qm = QueueManager()
-    qm.scan('mypackage.jobs')
-    qm.enqueue('mypackage.jobs.important', somearg='fred')
+    qm.enqueue('mypackage.jobs:important', somearg='fred')
 
 The :meth:`~retools.queue.QueueManager.scan` must be called before jobs can
 be enqueued.
@@ -55,6 +54,8 @@ import uuid
 from datetime import datetime
 from optparse import OptionParser
 
+import pkg_resources
+
 try:
     import json
 except ImportError: #pragma: nocover
@@ -68,62 +69,6 @@ from retools.exc import UnregisteredJob
 from retools.exc import ConfigurationError
 from retools.util import with_nested_contexts
 
-# Global to indicate the current job being processed
-current_job = None
-
-registered_jobs = {}
-registered_functions = {}
-
-
-def _decorate_function(func, kwargs):
-    """Register this function and its kwargs with the job/function
-    registries"""
-    queue_name = kwargs.pop('queue_name', None)
-    job_name = kwargs.pop('name', func.__module__ + '.' + func.__name__)
-    registered_jobs[job_name] = func
-    registered_functions[func] = (job_name, kwargs, queue_name)
-    return func
-
-
-def job(*args, **kwargs):
-    """Register a job for this function
-
-    :param name: Set the job name manually. By default the job name is the
-                 module + function name. I.e. ``retools.queue.job_func``.
-    :param queue_name: Queue name this job should be added to. Defaults
-                       to the
-                       :attr:`~retools.queue.QueueManager.default_queue_name`
-                       setting which has the default value of ``main``.
-
-    These arguments must be passed as keyword arguments, additional
-    keyword arguments are ignored but may be useful for extensibility.
-
-    This decorator can be used without arguments, in which case the
-    defaults are used. Decorated functions are not modified by the
-    :func:`~retools.queue.job` decorator and can be used normally.
-
-    All arguments for the decorated function **must** be keyword arguments.
-
-    Example::
-
-        from retools.queue import job
-
-        @job
-        def do_task(val=None):
-            # do the task
-
-        @job(category='cache_cleanup')
-        def regenerate_values(cache_args=None):
-            # regenerate cache values
-
-    """
-    if kwargs:
-        def fold(func):
-            return _decorate_function(func, kwargs)
-        return fold
-    else:
-        return _decorate_function(args[0], {})
-
 
 class QueueManager(object):
     """Configures and enqueues jobs"""
@@ -135,78 +80,50 @@ class QueueManager(object):
         """
         self.default_queue_name = default_queue_name
         self.redis = redis or global_connection.redis
-
-    def scan(self, *modules):
-        """Scan modules for jobs to register with the
-        :class:`~retools.queue.QueueManager`
-
-        This must be called before jobs can be enqueued.
-
-        :param package_name: Dotted notation for a package to scan. I.e.
-                             'mypackage.subpackage'
-
+        self.names = {} # cache name lookups
+        self.job_config = {}
+    
+    def set_queue_for_job(self, job_name, queue_name):
+        """Set the queue that a given job name will go to
+        
+        :param job_name: The pkg_resource name of the job function. I.e.
+                         retools.jobs:my_function
+        :param queue_name: Name of the queue on Redis job payloads should go
+                           to
         """
-        for mod in modules:
-            __import__(mod)
+        self.job_config[job_name] = queue_name
 
     def enqueue(self, job, **kwargs):
         """Enqueue a job
 
-        :param job: Either the dotted name of the job to enqueue, or
-                    a function that has been decorated as a job.
+        :param job: The pkg_resouce name of the function. I.e. 
+                    retools.jobs:my_function
         :param kwargs: Keyword arguments the job should be called with.
                        These arguments must be serializeable by JSON.
         :returns: The job id that was queued.
 
         """
-        if job in registered_functions:
-            job_name, dec_kwargs, queue_name = registered_functions[job]
-        elif job in registered_jobs:
-            func = registered_jobs[job]
-            job_name, dec_kwargs, queue_name = registered_functions[func]
-        else:
-            raise UnregisteredJob("No job registered for: %s" % job)
-        
+        if job not in self.names:
+            job_func = pkg_resources.EntryPoint.parse('x=%s' % job).load(False)
+            self.names[job] = job_func
+
+        queue_name = kwargs.pop('queue_name', None)
         if not queue_name:
-            queue_name = self.default_queue_name
+            queue_name = self.job_config.get('job', self.default_queue_name)
         
         full_queue_name = 'retools:queue:' + queue_name
         job_id = uuid.uuid4().hex
         job_dct = {
             'job_id': job_id,
-            'job': job_name,
+            'job': job,
             'kwargs': kwargs,
-            'dec_kwargs': dec_kwargs
+            'state': {}
         }
         pipeline = self.redis.pipeline()
         pipeline.rpush(full_queue_name, json.dumps(job_dct))
         pipeline.sadd('retools:queues', queue_name)
         pipeline.execute()
         return job_id
-
-    def enqueue_job(self, job):
-        """Enqueue a job given a ``Job`` instance
-
-        All parameters from the existing job instance are used to enqueue
-        this job with the current ``Job`` instance parameters.
-
-        """
-        full_queue_name = job.queue_name
-        job_dct = {
-            'job_id': job.job_id,
-            'job': job.job_name,
-            'kwargs': job.kwargs,
-            'dec_kwargs': job.dec_kwargs
-        }
-        queue_name = full_queue_name.lstrip('retools:queue:')
-        pipeline = self.redis.pipeline()
-        pipeline.rpush(full_queue_name, json.dumps(job_dct))
-        pipeline.sadd('retools:queues', queue_name)
-        pipeline.execute()
-        return job_id
-
-
-global_queue_manager = QueueManager()
 
 
 class Job(object):
@@ -233,9 +150,9 @@ class Job(object):
         self.job_name = payload['job']
         self.queue_name = queue_name
         self.kwargs = payload['kwargs']
-        self.dec_kwargs = payload['dec_kwargs']
+        self.state = payload['state']
         self.redis = redis
-        self.func = registered_jobs[self.job_name]
+        self.func = None
 
     def perform(self):
         """Runs the job calling all the job signals as appropriate"""
@@ -252,6 +169,21 @@ class Job(object):
         except Exception, exc:
             event['job_failure'].send(self.func, job=self, exc=exc)
             return False
+    
+    def enqueue(self):
+        full_queue_name = self.queue_name
+        job_dct = {
+            'job_id': self.job_id,
+            'job': self.job_name,
+            'kwargs': self.kwargs,
+            'state': self.state
+        }
+        queue_name = full_queue_name.lstrip('retools:queue:')
+        pipeline = self.redis.pipeline()
+        pipeline.rpush(full_queue_name, json.dumps(job_dct))
+        pipeline.sadd('retools:queues', queue_name)
+        pipeline.execute()
+        return job_id
 
 
 class Worker(object):
@@ -278,6 +210,7 @@ class Worker(object):
         self.paused = self.shutdown = False
         self.job = None
         self.child_id = None
+        self.jobs = {} # job function import cache
 
     @property
     def worker_id(self):
@@ -358,8 +291,18 @@ class Worker(object):
         if not queue_name:
             return False
 
-        self.job = Job(queue_name=queue_name, job_payload=job_payload,
-                       redis=self.redis, event=event)
+        self.job = job = Job(queue_name=queue_name, job_payload=job_payload,
+                             redis=self.redis, event=self.event)
+        try:
+            job.func = self.jobs[job.job_name]
+        except KeyError:
+            mod_name, func_name = job.job_name.split(':')
+            __import__(mod_name)
+            mod = sys.modules[mod_name]
+            configure_events = getattr(mod, 'configure_events', None)
+            if configure_events:
+                configure_events(self.event)
+            job.func = self.jobs[job.job_name] = getattr(mod, func_name)
         return True
 
     def set_proc_title(self, title):
@@ -387,7 +330,7 @@ class Worker(object):
         self.register_signal_handlers()
         self.prune_dead_workers()
         self.register_worker()
-        worker_startup.send(self)
+        self.event['worker_startup'].send(self)
 
     def trigger_shutdown(self, *args):
         """Graceful shutdown of the worker"""
@@ -460,7 +403,7 @@ class Worker(object):
 
 
 def run_worker():
-    usage = "usage: %prog queues packages_to_scan"
+    usage = "usage: %prog queues"
     parser = OptionParser(usage=usage)
     parser.add_option("--interval", dest="interval", type="int", default=5,
                       help="Polling interval")
@@ -470,19 +413,8 @@ def run_worker():
     
     if len(args) < 1:
         sys.exit("Error: Failed to provide queues or packages_to_scan args")
-    if len(args) < 2:
-        sys.exit("Error: Failed to provide both arguments")
     
-    # Create the event object
-    event = Event()
-    
-    # Scan the package
-    for mod_name in args[1].split(','):
-        mod = __import__(mod_name)
-        configure_events = getattr(mod, 'configure_events', None)
-        if configure_events:
-            configure_events(event)
-    
+    event = Event()    
     worker = Worker(queues=args[0].split(','), event=event)
     worker.work(interval=options.interval, blocking=options.blocking)
     sys.exit()

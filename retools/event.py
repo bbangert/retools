@@ -102,7 +102,7 @@ class Event(object):
             events[name] = Signal()
         self.events = events
     
-    def listen(event, handler, jobs=None):
+    def listen(self, event, handler, jobs=None):
         """Bind a handler to an event, optionally for specific senders
         
         :param event: The name of the event to bind for
