@@ -32,9 +32,6 @@ Running Jobs::
                   handler='mypackage.jobs:my_event_handler)
     qm.enqueue('mypackage.jobs:important', somearg='fred')
 
-The :meth:`~retools.queue.QueueManager.scan` must be called before jobs can
-be enqueued.
-
 """
 import os
 import signal
@@ -123,10 +120,7 @@ class QueueManager(object):
         events = self.global_events.copy()
         if job in self.job_events:
             for k, v in self.job_events[job].items():
-                if k in events:
-                    events[k].extend(v)
-                else:
-                    events[k] = v
+                events.setdefault(k, []).extend(v)
         
         job_dct = {
             'job_id': job_id,
@@ -224,13 +218,11 @@ class Job(object):
 
 class Worker(object):
     """A Worker works on jobs"""
-    def __init__(self, queues, event, redis=None):
+    def __init__(self, queues, redis=None):
         """Create a worker
 
         :param queues: List of queues to process
         :type queues: list
-        :param event: An :class:`~retools.event.Event` instance used to
-                      dispatch events.
         :param redis: Redis instance to use, defaults to the global_connection.
 
         In the event that there is only a single queue in the list
@@ -238,7 +230,6 @@ class Worker(object):
         processing
 
         """
-        self.event = event
         self.redis = redis or global_connection.redis
         if not queues:
             raise ConfigurationError("No queues were configured for this worker")
@@ -333,9 +324,6 @@ class Worker(object):
             mod_name, func_name = job.job_name.split(':')
             __import__(mod_name)
             mod = sys.modules[mod_name]
-            configure_events = getattr(mod, 'configure_events', None)
-            if configure_events:
-                configure_events(self.event)
             job.func = self.jobs[job.job_name] = getattr(mod, func_name)
         return True
 
@@ -447,7 +435,6 @@ def run_worker():
     if len(args) < 1:
         sys.exit("Error: Failed to provide queues or packages_to_scan args")
     
-    event = Event()    
-    worker = Worker(queues=args[0].split(','), event=event)
+    worker = Worker(queues=args[0].split(','))
     worker.work(interval=options.interval, blocking=options.blocking)
     sys.exit()
