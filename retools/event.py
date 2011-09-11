@@ -53,42 +53,6 @@ Signal handler will be called with the job function, the
 :class:`~retools.queue.Job` instance, and the exception object. The signal
 handler **should not raise an exception**.
 
-
-Worker Events
-=============
-
-worker_startup
---------------
-
-Runs when the worker starts up in the main worker process before any jobs have
-been processed.
-
-Signal handler will recieve the :class:`~retools.queue.Worker` instance as
-the sender.
-
-
-worker_shutdown
----------------
-
-Runs when the worker shuts down
-
-
-worker_prefork
---------------
-
-Runs at the beginning of every loop in the worker after a job has been
-reserved immediately before forking
-
-Signal handler will recieve the :class:`~retools.queue.Worker` instance and
-a keyword argument of ``job`` which is a :class:`~retools.queue.Job` instance.
-
-
-worker_postfork
----------------
-
-Runs in the worker child process immediately after a job was reserved and
-the worker child process was forked
-
 """
 from blinker import Signal
 
@@ -97,8 +61,7 @@ class Event(object):
     def __init__(self):
         events = {}
         for name in ['job_prerun', 'job_postrun', 'job_wrapper',
-                     'job_failure', 'worker_startup', 'worker_shutdown',
-                     'worker_prefork', 'worker_postfork']:
+                     'job_failure']:
             events[name] = Signal()
         self.events = events
     
