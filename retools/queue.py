@@ -19,13 +19,6 @@ Declaring jobs::
 
     def save_error(sender, **kwargs):
         # record error
-    
-    def configure_events(event):
-        # Hook up the my_event_handler just for the default_job function
-        event.listen('job_postrun', my_event_handler, jobs=[default_job])
-
-        # Hook up a handler for all job failures
-        event.listen('job_failure', save_error)
 
 
 Running Jobs::
@@ -34,6 +27,9 @@ Running Jobs::
     from retools.queue import QueueManager
     
     qm = QueueManager()
+    qm.subscriber('job_failure', handler='mypackage.jobs:save_error')
+    qm.subscriber('job_postrun', 'mypackage.jobs:important',
+                  handler='mypackage.jobs:my_event_handler)
     qm.enqueue('mypackage.jobs:important', somearg='fred')
 
 The :meth:`~retools.queue.QueueManager.scan` must be called before jobs can
@@ -78,6 +74,8 @@ class QueueManager(object):
         self.redis = redis or global_connection.redis
         self.names = {} # cache name lookups
         self.job_config = {}
+        self.job_events = {}
+        self.global_events = {}
     
     def set_queue_for_job(self, job_name, queue_name):
         """Set the queue that a given job name will go to
@@ -88,6 +86,19 @@ class QueueManager(object):
                            to
         """
         self.job_config[job_name] = queue_name
+    
+    def subscriber(self, event, job=None, handler=None):
+        """Set events for a specific job or for all jobs
+        
+        :param event: The name of the event to subscribe to.
+        :param job: Optional, a specific job to bind to.
+        :param handler: The location of the handler to call.
+        
+        """
+        if job:
+            self.job_events.setdefault(event, []).append(handler)
+        else:
+            self.global_events.setdefault(event, []).append(handler)
 
     def enqueue(self, job, **kwargs):
         """Enqueue a job
@@ -109,10 +120,19 @@ class QueueManager(object):
         
         full_queue_name = 'retools:queue:' + queue_name
         job_id = uuid.uuid4().hex
+        events = self.global_events.copy()
+        if job in self.job_events:
+            for k, v in self.job_events[job].items():
+                if k in events:
+                    events[k].extend(v)
+                else:
+                    events[k] = v
+        
         job_dct = {
             'job_id': job_id,
             'job': job,
             'kwargs': kwargs,
+            'events': events,
             'state': {}
         }
         pipeline = self.redis.pipeline()
@@ -147,8 +167,24 @@ class Job(object):
         self.queue_name = queue_name
         self.kwargs = payload['kwargs']
         self.state = payload['state']
+        self.events = {}
         self.redis = redis
         self.func = None
+        self.load_events()
+    
+    def load_events(self):
+        """Load all the events given the references"""
+        for k, v in self.payload['events'].items():
+            funcs = []
+            for name in v:
+                mod_name, func_name = name.split(':')
+                try:
+                    mod = sys.modules[mod_name]
+                except KeyError:
+                    __import__(mod_name)
+                    mod = sys.modules[mod_name]
+                funcs.append(getattr(mod, func_name))
+            self.events[k] = funcs
 
     def perform(self):
         """Runs the job calling all the job signals as appropriate"""
@@ -172,6 +208,7 @@ class Job(object):
             'job_id': self.job_id,
             'job': self.job_name,
             'kwargs': self.kwargs,
+            'events': self.payload['events'],
             'state': self.state
         }
         queue_name = full_queue_name.lstrip('retools:queue:')
@@ -180,6 +217,9 @@ class Job(object):
         pipeline.sadd('retools:queues', queue_name)
         pipeline.execute()
         return job_id
+    
+    def run_event(self, event):
+        pass
 
 
 class Worker(object):
@@ -246,7 +286,6 @@ class Worker(object):
                 self.set_proc_title("Waiting for %s" % self.queue_names)
                 
                 if not self.paused and self.reserve(interval, blocking):
-                    self.event['worker_prefork'].send(self, job=self.job)
                     self.working_on()
                     self.child_id = os.fork()
                     if self.child_id:
@@ -269,7 +308,6 @@ class Worker(object):
                         time.sleep(interval)
         finally:
             self.unregister_worker()
-            self.event['worker_shutdown'].send(self)
 
     def reserve(self, interval, blocking):
         """Attempts to pull a job off the queue(s)"""
@@ -326,7 +364,6 @@ class Worker(object):
         self.register_signal_handlers()
         self.prune_dead_workers()
         self.register_worker()
-        self.event['worker_startup'].send(self)
 
     def trigger_shutdown(self, *args):
         """Graceful shutdown of the worker"""
