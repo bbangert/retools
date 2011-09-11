@@ -29,8 +29,6 @@ setup(name='retools',
       install_requires=[
           "setproctitle>=1.1.2",
           "redis>=2.4.5",
-          "blinker>=1.1",
-          "cmdln>=1.1",
       ],
       entry_points="""
       [console_scripts]
