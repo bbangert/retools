@@ -54,37 +54,3 @@ Signal handler will be called with the job function, the
 handler **should not raise an exception**.
 
 """
-from blinker import Signal
-
-class Event(object):
-    """Event class that manages job events"""
-    def __init__(self):
-        events = {}
-        for name in ['job_prerun', 'job_postrun', 'job_wrapper',
-                     'job_failure']:
-            events[name] = Signal()
-        self.events = events
-    
-    def listen(self, event, handler, jobs=None):
-        """Bind a handler to an event, optionally for specific senders
-        
-        :param event: The name of the event to bind for
-        :param handler: A reference to a function that should handle this
-                        event
-        :param jobs: Job functions that should be bound to this event. When
-                     not passed in, the handler will be bound globally
-                     to this event for all jobs.
-        :type jobs: list of function objects
-        
-        """
-        if event not in self.events:
-            raise Exception("Event '%s' is not a valid event name" % event)
-        
-        if jobs:
-            for job in jobs:
-                self.events[event].connect(handler, sender=job)
-        else:
-            self.events[event].connect(handler)
-    
-    def __getitem__(self, name):
-        return self.events[name]
