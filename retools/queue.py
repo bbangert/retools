@@ -53,7 +53,6 @@ except ImportError: #pragma: nocover
 from setproctitle import setproctitle
 
 from retools import global_connection
-from retools.event import Event
 from retools.exc import UnregisteredJob
 from retools.exc import ConfigurationError
 from retools.util import with_nested_contexts
@@ -93,7 +92,8 @@ class QueueManager(object):
         
         """
         if job:
-            self.job_events.setdefault(event, []).append(handler)
+            job_events = self.job_events.setdefault(job, {})
+            job_events.setdefault(event, []).append(handler)
         else:
             self.global_events.setdefault(event, []).append(handler)
 
@@ -137,14 +137,12 @@ class QueueManager(object):
 
 
 class Job(object):
-    def __init__(self, queue_name, job_payload, redis, event):
+    def __init__(self, queue_name, job_payload, redis):
         """Create a job instance given a JSON job payload
 
         :param job_payload: A JSON string representing a job.
         :param queue_name: The queue this job was pulled off of.
         :param redis: The redis instance used to pull this job.
-        :param event: An :class:`~retools.event.Event` instance used to
-                      dispatch events.
 
         A ``Job`` instance is created when the Worker pulls a
         job payload off the queue. The ``current_job`` global is set
@@ -154,7 +152,6 @@ class Job(object):
         global current_job
         current_job = self
         
-        self.event = event
         self.payload = payload = json.loads(job_payload)
         self.job_id = payload['job_id']
         self.job_name = payload['job']
@@ -164,11 +161,29 @@ class Job(object):
         self.events = {}
         self.redis = redis
         self.func = None
-        self.load_events()
+        self.events = self.load_events(event_dict=payload['events'])
     
-    def load_events(self):
-        """Load all the events given the references"""
-        for k, v in self.payload['events'].items():
+    def __repr__(self):
+        """Display representation of self"""
+        res = '<%s object at %s: ' % (self.__class__.__name__, hex(id(self)))
+        res += 'Events: %s, ' % self.events
+        res += 'State: %s, ' % self.state
+        res += 'Job ID: %s, ' % self.job_id
+        res += 'Job Name: %s, ' % self.job_name
+        res += 'Queue: %s' % self.queue_name
+        res += '>'
+        return res
+
+    @staticmethod
+    def load_events(event_dict):
+        """Load all the events given the references
+        
+        :param event_dict: A dictionary of events keyed by event name
+                           to a list of handlers for the event.
+        
+        """
+        events = {}
+        for k, v in event_dict.items():
             funcs = []
             for name in v:
                 mod_name, func_name = name.split(':')
@@ -178,22 +193,22 @@ class Job(object):
                     __import__(mod_name)
                     mod = sys.modules[mod_name]
                 funcs.append(getattr(mod, func_name))
-            self.events[k] = funcs
+            events[k] = funcs
+        return events
 
     def perform(self):
         """Runs the job calling all the job signals as appropriate"""
-        event = self.event
-        event['job_prerun'].send(self.func, job=self)
+        self.run_event('job_prerun')
         try:
-            if event['job_wrapper'].has_receivers_for(self.func):
-                handlers = list(event['job_wrapper'].recievers_for(self.func))
-                result = with_nested_contexts(handlers, self.func, [self], self.kwargs)
+            if 'job_wrapper' in self.events:
+                result = with_nested_contexts(self.events['job_wrapper'], 
+                                              self.func, [self], self.kwargs)
             else:
                 result = self.func(**self.kwargs)
-            event['job_postrun'].send(self.func, job=self, result=result)
+            self.run_event('job_postrun', result=result)
             return True
         except Exception, exc:
-            event['job_failure'].send(self.func, job=self, exc=exc)
+            self.run_event('job_failure', exc=exc)
             return False
     
     def enqueue(self):
@@ -212,8 +227,9 @@ class Job(object):
         pipeline.execute()
         return job_id
     
-    def run_event(self, event):
-        pass
+    def run_event(self, event, **kwargs):
+        for event_func in self.events.get(event, []):
+            event_func(job=self, **kwargs)
 
 
 class Worker(object):
@@ -317,7 +333,7 @@ class Worker(object):
             return False
 
         self.job = job = Job(queue_name=queue_name, job_payload=job_payload,
-                             redis=self.redis, event=self.event)
+                             redis=self.redis)
         try:
             job.func = self.jobs[job.job_name]
         except KeyError:
@@ -419,7 +435,6 @@ class Worker(object):
 
     def perform(self):
         """Run the job and call the appropriate signal handlers"""
-        self.event['worker_postfork'].send(self, job=self.job)
         self.job.perform()
 
 
