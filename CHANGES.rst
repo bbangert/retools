@@ -11,6 +11,7 @@ Features
 
 - Statistics for the cache is now optional and can be disabled to slightly
   reduce the Redis queries used to store/retrieve cache data.
+- Added first revision of worker/job Queue system, with event support.
 
 Internals
 ---------
