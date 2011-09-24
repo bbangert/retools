@@ -29,7 +29,7 @@ Running Jobs::
     qm = QueueManager()
     qm.subscriber('job_failure', handler='mypackage.jobs:save_error')
     qm.subscriber('job_postrun', 'mypackage.jobs:important',
-                  handler='mypackage.jobs:my_event_handler)
+                  handler='mypackage.jobs:my_event_handler')
     qm.enqueue('mypackage.jobs:important', somearg='fred')
 
 """
