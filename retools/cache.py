@@ -4,9 +4,9 @@ Cache regions are used to simplify common expirations and group function
 caches.
 
 To indicate functions should use cache regions, apply the decorator::
-    
+
     from retools.cache import cache_region
-    
+
     @cache_region('short_term')
     def myfunction(arg1):
         return arg1
@@ -38,24 +38,24 @@ NoneMarker = _NoneMarker()
 
 class CacheKey(object):
     """Cache Key object
-    
+
     Generator of cache keys for a variety of purposes once
     provided with a region, namespace, and key (args).
-    
+
     """
     def __init__(self, region, namespace, key, today=None):
         """Setup a CacheKey object
-        
+
         The CacheKey object creates the key-names used to store and
         retrieve values from Redis.
-        
+
         :param region: Name of the region
         :type region: string
         :param namespace: Namespace to use
         :type namespace: string
         :param key: Key of the cached data, to differentiate various
                     arguments to the same callable
-        
+
         """
         if not today:
             today = str(date.today())
@@ -70,64 +70,64 @@ class CacheKey(object):
 
 class CacheRegion(object):
     """CacheRegion manager and configuration object
-    
+
     For organization sake, the CacheRegion object is used to configure
     the available cache regions, query regions for currently cached
     keys, and set batches of keys by region for immediate expiration.
-    
+
     Caching can be turned off globally by setting enabled to False::
-        
+
         CacheRegion.enabled = False
-    
+
     Statistics should also be turned on or off globally::
-        
+
         CacheRegion.statistics = False
-    
+
     However, if only some namespaces should have statistics recorded,
     then this should be used directly.
-    
+
     """
     regions = {}
     enabled = True
     statistics = True
-    
+
     @classmethod
-    def add_region(cls, name, expires, redis_expiration=60*60):
+    def add_region(cls, name, expires, redis_expiration=60 * 60):
         """Add a cache region to the current configuration
-        
+
         :param name: The name of the cache region
         :type name: string
         :param expires: The expiration in seconds.
         :type expires: integer
-        
+
         """
         cls.regions[name] = dict(expires=expires,
                                  redis_expiration=redis_expiration)
-        
+
     @classmethod
     def _add_tracking(cls, pipeline, region, namespace, key):
         """Add's basic set members for tracking
-        
+
         This is added to a Redis pipeline for a single round-trip to
         Redis.
-        
+
         """
         pipeline.sadd('retools:regions', region)
         pipeline.sadd('retools:%s:namespaces' % region, namespace)
         pipeline.sadd('retools:%s:%s:keys' % (region, namespace), key)
-    
+
     @classmethod
     def invalidate(cls, region):
         """Invalidate an entire region
-        
+
         .. note::
-            
+
             This does not actually *clear* the region of data, but
             just sets the value to expire on next access.
-            
+
         :param region: Region name
         :type region: string
-        
+
         """
         redis = global_connection.redis
         namespaces = redis.smembers('retools:%s:namespaces' % region)
@@ -136,7 +136,8 @@ class CacheRegion(object):
 
         # Locate the longest expiration of a region, so we can set
         # the created value far enough back to force a refresh
-        longest_expire = max([x['expires'] for x in CacheRegion.regions.values()])
+        longest_expire = max(
+              [x['expires'] for x in CacheRegion.regions.values()])
         new_created = time.time() - longest_expire - 3600
 
         for ns in namespaces:
@@ -148,18 +149,18 @@ class CacheRegion(object):
                     redis.srem(cache_keyset_key, key)
                 else:
                     redis.hset(cache_key, 'created', new_created)
-    
+
     @classmethod
     def load(cls, region, namespace, key, regenerate=True, callable=None,
              statistics=None):
         """Load a value from Redis, and possibly recreate it
-        
+
         This method is used to load a value from Redis, and usually
         regenerates the value using the callable when provided.
-        
+
         If ``regenerate`` is ``False`` and a ``callable`` is not passed
         in, then :obj:`~retools.cache.NoneMarker` will be returned.
-        
+
         :param region: Region name
         :type region: string
         :param namespace: Namespace for the value
@@ -177,7 +178,7 @@ class CacheRegion(object):
         :param statistics: Whether or not hit/miss statistics should be
                            updated
         :type statistics: bool
-        
+
         """
         if statistics is None:
             statistics = cls.statistics
@@ -185,9 +186,9 @@ class CacheRegion(object):
         now = time.time()
         region_settings = cls.regions[region]
         expires = region_settings['expires']
-        
+
         keys = CacheKey(region=region, namespace=namespace, key=key)
-        
+
         # Create a transaction to update our hit counter for today and
         # retrieve the current value.
         if statistics:
@@ -203,38 +204,38 @@ class CacheRegion(object):
                 existing_hits = int(existing_hits)
         else:
             result = redis.hgetall(keys.redis_key)
-        
+
         expired = True
         if result and now - float(result['created']) < expires:
             expired = False
-        
+
         if (result and not regenerate) or not expired:
             # We have a result and were told not to regenerate so
-            # we always return it immediately regardless of expiration, 
+            # we always return it immediately regardless of expiration,
             # or its not expired
             return cPickle.loads(result['value'])
-        
+
         if not result and not regenerate:
             # No existing value, but we were told not to regenerate it and
             # there's no callable, so we return a NoneMarker
             return NoneMarker
-        
+
         # We either have a result and its expired, or no result
         # Does someone already have the lock? If so, return the value if
         # we have one
         if result and redis.exists(keys.lock_key):
             return cPickle.loads(result['value'])
-        
-        with Lock(keys.lock_key, expires=expires, timeout=60*60*24*7):
+
+        with Lock(keys.lock_key, expires=expires, timeout=60 * 60 * 24 * 7):
             # Did someone else already create it?
             result = redis.hgetall(keys.redis_key)
             if 'value' in result and now - float(result['created']) < expires:
                 return cPickle.loads(result['value'])
 
             value = callable()
-            
+
             p = redis.pipeline(transaction=True)
-            p.hmset(keys.redis_key, {'created': now, 
+            p.hmset(keys.redis_key, {'created': now,
                                 'value': cPickle.dumps(value)})
             cls._add_tracking(p, region, namespace, key)
             if statistics:
@@ -242,11 +243,11 @@ class CacheRegion(object):
                 new_hits = int(p.execute()[0])
             else:
                 p.execute()
-        
+
         # Nothing else to do if not recording stats
         if not statistics:
             return value
-        
+
         misses = new_hits - existing_hits
         if misses:
             p = redis.pipeline(transaction=True)
@@ -260,56 +261,56 @@ class CacheRegion(object):
 
 def invalidate_region(region):
     """Invalidate all the namespace's in a given region
-    
+
     .. note::
-        
+
         This does not actually *clear* the region of data, but
         just sets the value to expire on next access.
-        
+
     :param region: Region name
     :type region: string
-    
+
     """
     CacheRegion.invalidate(region)
 
 
 def invalidate_callable(callable, *args):
     """Invalidate the cache for a callable
-    
+
     :param callable: The callable that was cached
     :type callable: callable object
     :param \*args: Arguments the function was called with that
                    should be invalidated. If the args is just the
                    differentiator for the function, or not present, then all
                    values for the function will be invalidated.
-    
+
     Example::
-        
+
         @cache_region('short_term', 'small_engine')
         def local_search(search_term):
             # do search and return it
-        
+
         @cache_region('long_term')
         def lookup_folks():
             # look them up and return them
-        
+
         # To clear local_search for search_term = 'fred'
         invalidate_function(local_search, 'fred')
-        
+
         # To clear all cached variations of the local_search function
         invalidate_function(local_search)
-        
+
         # To clear out lookup_folks
         invalidate_function(lookup_folks)
-    
+
     """
     redis = global_connection.redis
     region = callable._region
     namespace = callable._namespace
-    
+
     # Get the expiration for this region
     new_created = time.time() - CacheRegion.regions[region]['expires'] - 3600
-    
+
     if args:
         try:
             cache_key = " ".join(map(str, args))
@@ -327,6 +328,7 @@ def invalidate_callable(callable, *args):
         p.execute()
     return None
 invalidate_function = invalidate_callable
+
 
 def cache_region(region, *deco_args, **kwargs):
     """Decorate a function such that its return result is cached,
@@ -354,15 +356,15 @@ def cache_region(region, *deco_args, **kwargs):
     Example::
 
         from retools.cache import cache_region
-        
+
         @cache_region('short_term', 'load_things')
         def load(search_term, limit, offset):
             '''Load from a database given a search term, limit, offset.'''
             return database.query(search_term)[offset:offset + limit]
-    
+
     The decorator can also be used with object methods.  The ``self``
-    argument is not part of the cache key.  This is based on the 
-    actual string name ``self`` being in the first argument 
+    argument is not part of the cache key.  This is based on the
+    actual string name ``self`` being in the first argument
     position::
 
         class MyThing(object):
@@ -370,10 +372,10 @@ def cache_region(region, *deco_args, **kwargs):
             def load(self, search_term, limit, offset):
                 '''Load from a database given a search term, limit, offset.'''
                 return database.query(search_term)[offset:offset + limit]
-    
+
     Classmethods work as well - use ``cls`` as the name of the class argument,
     and place the decorator around the function underneath ``@classmethod``::
-    
+
         class MyThing(object):
             @classmethod
             @cache_region('short_term', 'load_things')
@@ -382,23 +384,24 @@ def cache_region(region, *deco_args, **kwargs):
                 return database.query(search_term)[offset:offset + limit]
 
     .. note::
-    
+
         When a method on a class is decorated, the ``self`` or ``cls``
         argument in the first position is
         not included in the "key" used for caching.
-    
+
     """
     def decorate(func):
         namespace = func_namespace(func, deco_args)
         skip_self = has_self_arg(func)
         regenerate = kwargs.get('regenerate', True)
+
         def cached(*args):
             if region not in CacheRegion.regions:
                 raise CacheConfigurationError(
                     'Cache region not configured: %s' % region)
             if not CacheRegion.enabled:
                 return func(*args)
-            
+
             if skip_self:
                 try:
                     cache_key = " ".join(map(str, args[1:]))
@@ -409,6 +412,7 @@ def cache_region(region, *deco_args, **kwargs):
                     cache_key = " ".join(map(str, args))
                 except UnicodeEncodeError:
                     cache_key = " ".join(map(unicode, args))
+
             def go():
                 return func(*args)
             return CacheRegion.load(region, namespace, cache_key,

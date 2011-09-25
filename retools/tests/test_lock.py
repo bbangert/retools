@@ -8,11 +8,12 @@ from nose.tools import eq_
 from mock import Mock
 from mock import patch
 
+
 class TestLock(unittest.TestCase):
     def _makeOne(self):
         from retools.lock import Lock
         return Lock
-    
+
     def _lockException(self):
         from retools.lock import LockTimeout
         return LockTimeout
@@ -23,6 +24,7 @@ class TestLock(unittest.TestCase):
         old_conn = retools.global_connection.redis
         try:
             retools.global_connection.redis = mock_redis
+
             def test_it():
                 lock = self._makeOne()
                 with lock('somekey'):
@@ -34,9 +36,10 @@ class TestLock(unittest.TestCase):
             eq_(len(method_names), 2)
         finally:
             retools.global_connection.redis = old_conn
-    
+
     def test_nocontention(self):
         mock_redis = Mock(spec=redis.Redis)
+
         @patch('retools.global_connection._redis', mock_redis)
         def test_it():
             lock = self._makeOne()
@@ -47,13 +50,13 @@ class TestLock(unittest.TestCase):
         eq_(method_names[0], 'setnx')
         eq_(method_names[1], 'delete')
         eq_(len(method_names), 2)
-        
+
     def test_nocontention_and_no_lock_delete(self):
         mock_redis = Mock(spec=redis.Redis)
         mock_time = Mock()
         vals = [35, 0, 0, 0]
         mock_time.side_effect = lambda: vals.pop()
-        
+
         @patch('retools.global_connection._redis', mock_redis)
         @patch('time.time', mock_time)
         def test_it():
@@ -73,24 +76,26 @@ class TestLock(unittest.TestCase):
         mock_redis.get.return_value = False
         mock_redis.setnx.return_value = False
         timeout = self._lockException()
-        
+
         @raises(timeout)
         @patch('retools.global_connection._redis', mock_redis)
         @patch('time.time', mock_time)
         @patch('time.sleep', Mock())
         def test_it():
             lock = self._makeOne()
-            with lock('somekey', expires=30, timeout=0): val = 2 + 4
+            with lock('somekey', expires=30, timeout=0):
+                val = 2 + 4
         test_it()
         method_names = [x[0] for x in mock_redis.method_calls]
         eq_(method_names[0], 'setnx')
         eq_(len(method_names), 2)
-    
+
     def test_contention(self):
         mock_redis = Mock(spec=redis.Redis)
         mock_redis.get.return_value = 150
         mock_redis.getset.return_value = 150
         mock_redis.setnx.return_value = False
+
         @patch('retools.global_connection._redis', mock_redis)
         def test_it():
             lock = self._makeOne()
@@ -101,7 +106,7 @@ class TestLock(unittest.TestCase):
         setnx, get = mock_redis.method_calls[:2]
         eq_(setnx[1][0], 'somekey')
         eq_(get[1][0], 'somekey')
-    
+
     def test_timeout_current_val_is_newer(self):
         mock_redis = Mock(spec=redis.Redis)
         mock_redis.setnx.return_value = False
@@ -109,15 +114,16 @@ class TestLock(unittest.TestCase):
         timeout = self._lockException()
         mock_time = Mock()
         mock_time.return_value = 0
-        
+
         array = []
+
         @raises(timeout)
         @patch('retools.global_connection._redis', mock_redis)
         @patch('time.sleep', mock_time)
         def test_it():
             lock = self._makeOne()
             with lock('somekey', timeout=1):
-                array.append(4) # pragma: nocover
+                array.append(4)  # pragma: nocover
         test_it()
         eq_(len(array), 0)
 
@@ -129,14 +135,15 @@ class TestLock(unittest.TestCase):
         timeout = self._lockException()
         mock_time = Mock()
         mock_time.return_value = 0
-        
+
         array = []
+
         @raises(timeout)
         @patch('retools.global_connection._redis', mock_redis)
         @patch('time.sleep', mock_time)
         def test_it():
             lock = self._makeOne()
             with lock('somekey', timeout=1, redis=mock_redis):
-                array.append(4) # pragma: nocover
+                array.append(4)  # pragma: nocover
         test_it()
         eq_(len(array), 0)

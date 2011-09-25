@@ -25,7 +25,8 @@ class TestJob(TestQueue):
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         mock_redis.pipeline.return_value = mock_pipeline
         qm = self._makeQM(redis=mock_redis)
-        job_id = qm.enqueue('retools.tests.jobs:echo_default', default='hi there')
+        job_id = qm.enqueue('retools.tests.jobs:echo_default',
+                            default='hi there')
         meth, args, kw = mock_pipeline.method_calls[0]
         eq_('rpush', meth)
         eq_(kw, {})
@@ -39,7 +40,8 @@ class TestJob(TestQueue):
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         mock_redis.pipeline.return_value = mock_pipeline
         qm = self._makeQM(redis=mock_redis)
-        job_id = qm.enqueue('retools.tests.jobs:echo_default', default='hi there')
+        job_id = qm.enqueue('retools.tests.jobs:echo_default',
+                            default='hi there')
         meth, args, kw = mock_pipeline.method_calls[0]
         eq_('rpush', meth)
         eq_(kw, {})
