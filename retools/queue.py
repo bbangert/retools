@@ -5,14 +5,14 @@ Any job that takes keyword arguments can be a ``job`` that a worker runs. The
 to be run.
 
 Declaring jobs::
-    
+
     # jobs.py
     def default_job():
         # do some basic thing
 
     def important(somearg=None):
         # do an important thing
-    
+
 
     def my_event_handler(sender, **kwargs):
         # do something
@@ -25,7 +25,7 @@ Running Jobs::
 
     # main.py
     from retools.queue import QueueManager
-    
+
     qm = QueueManager()
     qm.subscriber('job_failure', handler='mypackage.jobs:save_error')
     qm.subscriber('job_postrun', 'mypackage.jobs:important',
@@ -47,7 +47,7 @@ import pkg_resources
 
 try:
     import json
-except ImportError: #pragma: nocover
+except ImportError:  # pragma: nocover
     import simplejson as json
 
 from setproctitle import setproctitle
@@ -68,28 +68,28 @@ class QueueManager(object):
         """
         self.default_queue_name = default_queue_name
         self.redis = redis or global_connection.redis
-        self.names = {} # cache name lookups
+        self.names = {}  # cache name lookups
         self.job_config = {}
         self.job_events = {}
         self.global_events = {}
-    
+
     def set_queue_for_job(self, job_name, queue_name):
         """Set the queue that a given job name will go to
-        
+
         :param job_name: The pkg_resource name of the job function. I.e.
                          retools.jobs:my_function
         :param queue_name: Name of the queue on Redis job payloads should go
                            to
         """
         self.job_config[job_name] = queue_name
-    
+
     def subscriber(self, event, job=None, handler=None):
         """Set events for a specific job or for all jobs
-        
+
         :param event: The name of the event to subscribe to.
         :param job: Optional, a specific job to bind to.
         :param handler: The location of the handler to call.
-        
+
         """
         if job:
             job_events = self.job_events.setdefault(job, {})
@@ -100,7 +100,7 @@ class QueueManager(object):
     def enqueue(self, job, **kwargs):
         """Enqueue a job
 
-        :param job: The pkg_resouce name of the function. I.e. 
+        :param job: The pkg_resouce name of the function. I.e.
                     retools.jobs:my_function
         :param kwargs: Keyword arguments the job should be called with.
                        These arguments must be serializeable by JSON.
@@ -114,14 +114,14 @@ class QueueManager(object):
         queue_name = kwargs.pop('queue_name', None)
         if not queue_name:
             queue_name = self.job_config.get('job', self.default_queue_name)
-        
+
         full_queue_name = 'retools:queue:' + queue_name
         job_id = uuid.uuid4().hex
         events = self.global_events.copy()
         if job in self.job_events:
             for k, v in self.job_events[job].items():
                 events.setdefault(k, []).extend(v)
-        
+
         job_dct = {
             'job_id': job_id,
             'job': job,
@@ -151,7 +151,7 @@ class Job(object):
         """
         global current_job
         current_job = self
-        
+
         self.payload = payload = json.loads(job_payload)
         self.job_id = payload['job_id']
         self.job_name = payload['job']
@@ -162,7 +162,7 @@ class Job(object):
         self.redis = redis
         self.func = None
         self.events = self.load_events(event_dict=payload['events'])
-    
+
     def __repr__(self):
         """Display representation of self"""
         res = '<%s object at %s: ' % (self.__class__.__name__, hex(id(self)))
@@ -177,10 +177,10 @@ class Job(object):
     @staticmethod
     def load_events(event_dict):
         """Load all the events given the references
-        
+
         :param event_dict: A dictionary of events keyed by event name
                            to a list of handlers for the event.
-        
+
         """
         events = {}
         for k, v in event_dict.items():
@@ -201,7 +201,7 @@ class Job(object):
         self.run_event('job_prerun')
         try:
             if 'job_wrapper' in self.events:
-                result = with_nested_contexts(self.events['job_wrapper'], 
+                result = with_nested_contexts(self.events['job_wrapper'],
                                               self.func, [self], self.kwargs)
             else:
                 result = self.func(**self.kwargs)
@@ -210,7 +210,7 @@ class Job(object):
         except Exception, exc:
             self.run_event('job_failure', exc=exc)
             return False
-    
+
     def enqueue(self):
         full_queue_name = self.queue_name
         job_dct = {
@@ -226,7 +226,7 @@ class Job(object):
         pipeline.sadd('retools:queues', queue_name)
         pipeline.execute()
         return job_id
-    
+
     def run_event(self, event, **kwargs):
         for event_func in self.events.get(event, []):
             event_func(job=self, **kwargs)
@@ -248,18 +248,20 @@ class Worker(object):
         """
         self.redis = redis or global_connection.redis
         if not queues:
-            raise ConfigurationError("No queues were configured for this worker")
+            raise ConfigurationError(
+                  "No queues were configured for this worker")
         self.queues = ['retools:queue:%s' % x for x in queues]
         self.paused = self.shutdown = False
         self.job = None
         self.child_id = None
-        self.jobs = {} # job function import cache
+        self.jobs = {}  # job function import cache
 
     @property
     def worker_id(self):
         """Returns this workers id based on hostname, pid, queues"""
-        return '%s:%s:%s' % (socket.gethostname(), os.getpid(), self.queue_names)
-    
+        return '%s:%s:%s' % (socket.gethostname(), os.getpid(),
+              self.queue_names)
+
     @property
     def queue_names(self):
         names = [x.lstrip('retools:queue:') for x in self.queues]
@@ -288,10 +290,10 @@ class Worker(object):
             while 1:
                 if self.shutdown:
                     break
-                
+
                 # Set this first since reserve may block for awhile
                 self.set_proc_title("Waiting for %s" % self.queue_names)
-                
+
                 if not self.paused and self.reserve(interval, blocking):
                     self.working_on()
                     self.child_id = os.fork()
@@ -311,7 +313,8 @@ class Worker(object):
                     if self.paused:
                         self.set_proc_title("Paused")
                     elif not blocking:
-                        self.set_proc_title("Waiting for %s" % self.queue_names)
+                        self.set_proc_title(
+                              "Waiting for %s" % self.queue_names)
                         time.sleep(interval)
         finally:
             self.unregister_worker()
@@ -443,13 +446,14 @@ def run_worker():
     parser = OptionParser(usage=usage)
     parser.add_option("--interval", dest="interval", type="int", default=5,
                       help="Polling interval")
-    parser.add_option("-b", dest="blocking", action="store_true", default=False,
+    parser.add_option("-b", dest="blocking", action="store_true",
+                      default=False,
                       help="Whether to use blocking queue semantics")
     (options, args) = parser.parse_args()
-    
+
     if len(args) < 1:
         sys.exit("Error: Failed to provide queues or packages_to_scan args")
-    
+
     worker = Worker(queues=args[0].split(','))
     worker.work(interval=options.interval, blocking=options.blocking)
     sys.exit()

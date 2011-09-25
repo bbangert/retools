@@ -49,7 +49,7 @@ job_failure
 
 Runs in the child process when a job throws an exception
 
-Signal handler will be called with the job function, the 
+Signal handler will be called with the job function, the
 :class:`~retools.queue.Job` instance, and the exception object. The signal
 handler **should not raise an exception**.
 

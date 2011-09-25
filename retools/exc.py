@@ -1,5 +1,6 @@
 """retools exceptions"""
 
+
 class RetoolsException(BaseException):
     """retools package base exception"""
 
