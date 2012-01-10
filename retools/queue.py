@@ -31,6 +31,12 @@ Running Jobs::
     qm.enqueue('mypackage.jobs:important', somearg='fred')
 
 
+.. note::
+
+    The events for a job are registered with the :class:`QueueManager` and are
+    encoded in the job's JSON blob. Updating events for a job will therefore
+    only take effect for new jobs queued, and not existing ones on the queue.
+
 Events
 ======
 
@@ -46,6 +52,21 @@ Available events to register for:
 * **job_postrun**: Runs after the job completes *successfully*, this will not
   be run if the job throws an exception.
 * **job_failure**: Runs when a job throws an exception.
+
+Event Function Signatures
+-------------------------
+
+Event functions are all called with keyword arguments, the first is always
+the :class:`Job` instance as the ``job`` argument.
+
+Deviations from this call signature:
+
+* **job_wrapper**: (job_function, job_instance, **job_keyword_arguments)
+* **job_postrun**: (job=job_instance, result=job_function_result)
+* **job_failure**: (job=job_instance, exc=job_exception)
+
+Attributes of interest on the job instance are documented in the
+:meth:`Job.__init__` method.
 
 """
 import os
@@ -158,9 +179,21 @@ class Job(object):
         :param queue_name: The queue this job was pulled off of.
         :param redis: The redis instance used to pull this job.
 
-        A ``Job`` instance is created when the Worker pulls a
+        A :class:`Job` instance is created when the Worker pulls a
         job payload off the queue. The ``current_job`` global is set
         upon creation to indicate the current job being processed.
+
+        Attributes of interest for event functions:
+
+        * **job_id**: The Job's ID
+        * **job_name**: The Job's name (it's package + function name)
+        * **queue_name**: The queue this job came from
+        * **kwargs**: The keyword arguments the job is called with
+        * **state**: The state dict, this can be used by events to retain
+          additional arguments. I.e. for a retry extension, retry information
+          can be stored in the ``state`` dict.
+        * **func**: A reference to the job function
+        * **redis**: A :class:`redis.Redis` instance.
 
         """
         global current_job

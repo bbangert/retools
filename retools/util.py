@@ -34,8 +34,8 @@ def with_nested_contexts(context_managers, func, args, kwargs):
 
     Example::
 
-        with ContextA(func, args, **kwargs):
-            with ContextB(func, args, **kwargs):
+        with ContextA(func, *args, **kwargs):
+            with ContextB(func, *args, **kwargs):
                 return func(**kwargs)
 
         # is equivilant to
