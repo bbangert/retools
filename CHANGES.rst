@@ -3,8 +3,14 @@ retools
 =======
 
 
-0.2 (**tip**)
-=============
+0.2 (01/10/2012)
+================
+
+Bug Fixes
+---------
+
+- Critical fix for caching that prevents old values from being displayed
+  forever. Thanks to Danial Hoth for tracking down the problem-aware.
 
 Features
 --------
