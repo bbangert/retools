@@ -18,15 +18,6 @@ retools - A Python Redis Toolset
     - 100% condition coverage (via instrumental_)
 
 
-Using Retools
-=============
-
-.. toctree::
-   :maxdepth: 2
-   
-   caching
-
-
 Reference Material
 ==================
 
@@ -36,6 +27,7 @@ Reference material includes documentation for every `retools` API.
    :maxdepth: 1
 
    api
+   Changelog <changelog>
 
 
 Indices and tables

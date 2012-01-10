@@ -1,6 +1,6 @@
-=======
-retools
-=======
+=========
+Changelog
+=========
 
 
 0.2 (01/10/2012)
@@ -24,7 +24,7 @@ Internals
 
 - Heavily refactored ``Connection`` to not be a class singleton, instead
   a global_connection instance is created and used by default.
-- Increased conditional coverage to 100% (via instrumental).
+- Increased conditional coverage to 100% (via instrumental_).
 
 Backwards Incompatibilities
 ---------------------------
@@ -62,3 +62,5 @@ Features
   a Redis global write-lock with old values served to prevent the dogpile
   effect
 - Redis global lock
+
+.. _instrumental: http://pypi.python.org/pypi/instrumental
