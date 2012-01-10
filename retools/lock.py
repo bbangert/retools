@@ -68,7 +68,8 @@ class Lock(object):
                 return
 
             timeout -= 1
-            time.sleep(1)
+            if timeout > 0:
+                time.sleep(1)
         raise LockTimeout("Timeout while waiting for lock")
 
     def __exit__(self, exc_type, exc_value, traceback):
