@@ -19,7 +19,3 @@ class QueueError(RetoolsException):
 
 class AbortJob(RetoolsException):
     """Raised to abort execution of a job"""
-
-
-class UnregisteredJob(RetoolsException):
-    """Raised when attempting to enqueue a job that isn't registered"""

@@ -1,4 +1,4 @@
-.. _cache_module:
+.. _lock_module:
 
 :mod:`retools.lock`
 -------------------

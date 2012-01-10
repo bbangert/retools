@@ -1,12 +1,11 @@
 """Queue worker and manager
 
-Any job that takes keyword arguments can be a ``job`` that a worker runs. The
-:class:`~retools.queue.QueueManager` handles configuration and enqueing jobs
+Any function that takes keyword arguments can be a ``job`` that a worker runs.
+The :class:`~retools.queue.QueueManager` handles configuration and enqueing jobs
 to be run.
 
 Declaring jobs::
 
-    # jobs.py
     def default_job():
         # do some basic thing
 
@@ -23,7 +22,6 @@ Declaring jobs::
 
 Running Jobs::
 
-    # main.py
     from retools.queue import QueueManager
 
     qm = QueueManager()
@@ -31,6 +29,23 @@ Running Jobs::
     qm.subscriber('job_postrun', 'mypackage.jobs:important',
                   handler='mypackage.jobs:my_event_handler')
     qm.enqueue('mypackage.jobs:important', somearg='fred')
+
+
+Events
+======
+
+The retools queue has events available for additional functionality without
+having to subclass or directly extend retools. These functions will be run by
+the worker when the job is handled.
+
+Available events to register for:
+
+* **job_prerun**: Runs immediately before the job is run.
+* **job_wrapper**: Wraps the execution of the job, these should be context
+  managers.
+* **job_postrun**: Runs after the job completes *successfully*, this will not
+  be run if the job throws an exception.
+* **job_failure**: Runs when a job throws an exception.
 
 """
 import os
@@ -53,7 +68,6 @@ except ImportError:  # pragma: nocover
 from setproctitle import setproctitle
 
 from retools import global_connection
-from retools.exc import UnregisteredJob
 from retools.exc import ConfigurationError
 from retools.util import with_nested_contexts
 
@@ -212,6 +226,7 @@ class Job(object):
             return False
 
     def enqueue(self):
+        """Queue this job in Redis"""
         full_queue_name = self.queue_name
         job_dct = {
             'job_id': self.job_id,
@@ -225,9 +240,10 @@ class Job(object):
         pipeline.rpush(full_queue_name, json.dumps(job_dct))
         pipeline.sadd('retools:queues', queue_name)
         pipeline.execute()
-        return job_id
+        return self.job_id
 
     def run_event(self, event, **kwargs):
+        """Run all registered events for this job"""
         for event_func in self.events.get(event, []):
             event_func(job=self, **kwargs)
 

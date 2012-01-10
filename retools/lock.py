@@ -68,7 +68,7 @@ class Lock(object):
                 return
 
             timeout -= 1
-            if timeout > 0:
+            if timeout >= 0:
                 time.sleep(1)
         raise LockTimeout("Timeout while waiting for lock")
 
@@ -80,4 +80,4 @@ class Lock(object):
 
 
 class LockTimeout(BaseException):
-    pass
+    """Raised in the event a timeout occurs while waiting for a lock"""

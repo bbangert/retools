@@ -26,7 +26,6 @@ from datetime import date
 from retools import global_connection
 from retools.exc import CacheConfigurationError
 from retools.lock import Lock
-from retools.lock import LockTimeout
 from retools.util import func_namespace
 from retools.util import has_self_arg
 
@@ -229,7 +228,9 @@ class CacheRegion(object):
         with Lock(keys.lock_key, expires=expires, timeout=60 * 60 * 24 * 7):
             # Did someone else already create it?
             result = redis.hgetall(keys.redis_key)
-            if 'value' in result and now - float(result['created']) < expires:
+            now = time.time()
+            if result and 'value' in result and \
+               now - float(result['created']) < expires:
                 return cPickle.loads(result['value'])
 
             value = callable()

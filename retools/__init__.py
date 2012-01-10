@@ -29,14 +29,14 @@ class Connection(object):
     def __init__(self):
         self._redis = None
 
-    def _get_redis(self):
+    @property
+    def redis(self):
         if not self._redis:
             self._redis = Redis()
         return self._redis
 
-    def _set_redis(self, conn):
+    @redis.setter
+    def redis(self, conn):
         self._redis = conn
-
-    redis = property(_get_redis, _set_redis)
 
 global_connection = Connection()
