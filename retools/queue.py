@@ -56,11 +56,10 @@ Available events to register for:
 Event Function Signatures
 -------------------------
 
-Event functions are all called with keyword arguments, the first is always
-the :class:`Job` instance as the ``job`` argument.
+Event functions have different call semantics, the following is a list of how
+the event functions will be called:
 
-Deviations from this call signature:
-
+* **job_prerun**: (job=job_instance)
 * **job_wrapper**: (job_function, job_instance, **job_keyword_arguments)
 * **job_postrun**: (job=job_instance, result=job_function_result)
 * **job_failure**: (job=job_instance, exc=job_exception)
