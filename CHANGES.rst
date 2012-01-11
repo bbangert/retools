@@ -10,7 +10,7 @@ Bug Fixes
 ---------
 
 - Critical fix for caching that prevents old values from being displayed
-  forever. Thanks to Danial Hoth for tracking down the problem-aware.
+  forever. Thanks to Daniel Holth for tracking down the problem-aware.
 
 Features
 --------
