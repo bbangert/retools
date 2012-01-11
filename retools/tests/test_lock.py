@@ -85,7 +85,7 @@ class TestLock(unittest.TestCase):
         @patch('time.sleep', Mock())
         def test_it():
             lock = self._makeOne()
-            with lock('somekey', expires=30, timeout=0):
+            with lock('somekey', expires=30, timeout=0):  # pragma: nocover
                 val = 2 + 4
         test_it()
         method_names = [x[0] for x in mock_redis.method_calls]

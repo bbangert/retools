@@ -68,6 +68,20 @@ Deviations from this call signature:
 Attributes of interest on the job instance are documented in the
 :meth:`Job.__init__` method.
 
+Running the Worker
+==================
+
+After installing ``retools``, a ``retools-worker`` command will be available
+that can spawn a worker. Queues to watch can be listed in order for priority
+queueing, in which case the worker will try each queue in order looking for jobs
+to process.
+
+Example invokation:
+
+.. code-block:: bash
+
+    $ retools-worker high,medium,main
+
 """
 import os
 import signal
