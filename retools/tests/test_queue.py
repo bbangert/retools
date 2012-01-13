@@ -2,7 +2,6 @@
 import unittest
 import time
 
-import blinker
 import redis
 import redis.client
 import json
