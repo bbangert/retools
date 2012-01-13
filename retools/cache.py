@@ -219,31 +219,38 @@ class CacheRegion(object):
             # there's no callable, so we return a NoneMarker
             return NoneMarker
 
-        # We either have a result and its expired, or no result
-        # Does someone already have the lock? If so, return the value if
-        # we have one
-        if result and redis.exists(keys.lock_key):
-            return cPickle.loads(result['value'])
+        # Don't wait for the lock if we have an old value
+        if result and 'value' in result:
+            timeout = 0
+        else:
+            timeout = 60 * 60
 
-        with Lock(keys.lock_key, expires=expires, timeout=60 * 60 * 24 * 7):
-            # Did someone else already create it?
-            result = redis.hgetall(keys.redis_key)
-            now = time.time()
-            if result and 'value' in result and \
-               now - float(result['created']) < expires:
+        try:
+            with Lock(keys.lock_key, expires=expires, timeout=60 * 60 * 24 * 7):
+                # Did someone else already create it?
+                result = redis.hgetall(keys.redis_key)
+                now = time.time()
+                if result and 'value' in result and \
+                   now - float(result['created']) < expires:
+                    return cPickle.loads(result['value'])
+
+                value = callable()
+
+                p = redis.pipeline(transaction=True)
+                p.hmset(keys.redis_key, {'created': now,
+                                    'value': cPickle.dumps(value)})
+                cls._add_tracking(p, region, namespace, key)
+                if statistics:
+                    p.getset(keys.redis_hit_key, 0)
+                    new_hits = int(p.execute()[0])
+                else:
+                    p.execute()
+        except LockTimeout:
+            if result:
                 return cPickle.loads(result['value'])
-
-            value = callable()
-
-            p = redis.pipeline(transaction=True)
-            p.hmset(keys.redis_key, {'created': now,
-                                'value': cPickle.dumps(value)})
-            cls._add_tracking(p, region, namespace, key)
-            if statistics:
-                p.getset(keys.redis_hit_key, 0)
-                new_hits = int(p.execute()[0])
             else:
-                p.execute()
+                # log some sort of error?
+                return NoneMarker
 
         # Nothing else to do if not recording stats
         if not statistics:
