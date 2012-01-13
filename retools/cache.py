@@ -26,6 +26,7 @@ from datetime import date
 from retools import global_connection
 from retools.exc import CacheConfigurationError
 from retools.lock import Lock
+from retools.lock import LockTimeout
 from retools.util import func_namespace
 from retools.util import has_self_arg
 
