@@ -227,7 +227,7 @@ class CacheRegion(object):
             timeout = 60 * 60
 
         try:
-            with Lock(keys.lock_key, expires=expires, timeout=60 * 60 * 24 * 7):
+            with Lock(keys.lock_key, expires=expires, timeout=timeout):
                 # Did someone else already create it?
                 result = redis.hgetall(keys.redis_key)
                 now = time.time()
