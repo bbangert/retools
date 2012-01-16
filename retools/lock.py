@@ -55,7 +55,7 @@ class Lock(object):
             if redis.setnx(self.key, expires):
                 # We gained the lock; enter critical section
                 self.start_time = time.time()
-                redis.expire(self.key, expires)
+                redis.expire(self.key, int(expires))
                 return
 
             current_value = redis.get(self.key)
@@ -64,7 +64,7 @@ class Lock(object):
             if current_value and float(current_value) < time.time() and \
                redis.getset(self.key, expires) == current_value:
                 self.start_time = time.time()
-                redis.expire(self.key, expires)
+                redis.expire(self.key, int(expires))
                 return
 
             timeout -= 1
