@@ -11,6 +11,8 @@ Bug Fixes
 
 - Critical fix for caching that prevents old values from being displayed
   forever. Thanks to Daniel Holth for tracking down the problem-aware.
+- Actually sets the Redis expiration for a value when setting the cached
+  value in Redis. This defaults to 1 week.
 
 Features
 --------
