@@ -43,6 +43,8 @@ Running Jobs::
     encoded in the job's JSON blob. Updating events for a job will therefore
     only take effect for new jobs queued, and not existing ones on the queue.
 
+.. _queue_events:
+
 Events
 ======
 
@@ -72,6 +74,8 @@ the event functions will be called:
 
 Attributes of interest on the job instance are documented in the
 :meth:`Job.__init__` method.
+
+.. _queue_worker:
 
 Running the Worker
 ==================

@@ -14,10 +14,11 @@ retools - A Python Redis Toolset
 - :mod:`Distributed Locking <retools.lock>`
     - Python context-manager with lock timeouts and retries
 - :mod:`Queuing <retools.queue>`
-    - Simple forking worker based on `Resque`_
+    - Simple `forking worker <queue_worker>`_ based on `Resque`_
     - Jobs stored as JSON in Redis for easy introspection
     - `setproctitle`_ used by workers for easy worker introspection on
       the command line
+    - `Rich event system <queue_events>`_ for extending job processing behavior
 - Well Tested [1]_
     - 100% statement coverage
     - 100% condition coverage (via instrumental_)
