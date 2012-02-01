@@ -13,7 +13,7 @@ retools - A Python Redis Toolset
     - Write-lock to prevent the `Thundering Herd`_
 - Distributed Locking
     - Python context-manager with lock timeouts and retries
-- Well Tested
+- Well Tested *
     - 100% statement coverage
     - 100% condition coverage (via instrumental_)
 
@@ -37,6 +37,8 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
+
+ * (queuing not up to 100% testing yet)
 
 .. _`Thundering Herd`: http://en.wikipedia.org/wiki/Thundering_herd_problem
 .. _instrumental: http://pypi.python.org/pypi/instrumental
