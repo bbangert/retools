@@ -92,13 +92,16 @@ class CacheRegion(object):
     statistics = True
 
     @classmethod
-    def add_region(cls, name, expires, redis_expiration=60 * 60):
+    def add_region(cls, name, expires, redis_expiration=60 * 60 * 24 * 7):
         """Add a cache region to the current configuration
 
         :param name: The name of the cache region
         :type name: string
         :param expires: The expiration in seconds.
         :type expires: integer
+        :param redis_expiration: How long the Redis key expiration is
+                                 set for. Defaults to 1 week.
+        :type redis_expiration: integer
 
         """
         cls.regions[name] = dict(expires=expires,
@@ -186,6 +189,7 @@ class CacheRegion(object):
         now = time.time()
         region_settings = cls.regions[region]
         expires = region_settings['expires']
+        redis_expiration = region_settings['redis_expiration']
 
         keys = CacheKey(region=region, namespace=namespace, key=key)
 
@@ -240,6 +244,7 @@ class CacheRegion(object):
                 p = redis.pipeline(transaction=True)
                 p.hmset(keys.redis_key, {'created': now,
                                     'value': cPickle.dumps(value)})
+                p.expire(keys.redis_key, redis_expiration)
                 cls._add_tracking(p, region, namespace, key)
                 if statistics:
                     p.getset(keys.redis_hit_key, 0)

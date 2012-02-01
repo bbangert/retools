@@ -59,7 +59,7 @@ class TestCacheRegion(unittest.TestCase):
             assert 'This is a value' in value
             exec_calls = [x for x in mock_pipeline.method_calls \
                   if x[0] == 'execute']
-            eq_(len(mock_pipeline.method_calls), 10)
+            eq_(len(mock_pipeline.method_calls), 11)
             eq_(len(exec_calls), 2)
 
     def test_existing_value_no_regen(self):
@@ -108,7 +108,7 @@ class TestCacheRegion(unittest.TestCase):
             assert 'This is a value' in value
             exec_calls = [x for x in mock_pipeline.method_calls \
                   if x[0] == 'execute']
-            eq_(len(mock_pipeline.method_calls), 10)
+            eq_(len(mock_pipeline.method_calls), 11)
             eq_(len(exec_calls), 2)
 
     def test_value_expired_and_no_lock(self):
@@ -136,7 +136,7 @@ class TestCacheRegion(unittest.TestCase):
             assert 'This is a value' in value
             exec_calls = [x for x in mock_pipeline.method_calls \
                   if x[0] == 'execute']
-            eq_(len(mock_pipeline.method_calls), 10)
+            eq_(len(mock_pipeline.method_calls), 11)
             eq_(len(exec_calls), 2)
 
     def test_generate_value_no_stats(self):
@@ -164,7 +164,7 @@ class TestCacheRegion(unittest.TestCase):
             assert str(now) in value
             exec_calls = [x for x in mock_pipeline.method_calls \
                 if x[0] == 'execute']
-            eq_(len(mock_pipeline.method_calls), 5)
+            eq_(len(mock_pipeline.method_calls), 6)
             eq_(len(exec_calls), 1)
 
     def test_generate_value_other_creator(self):
