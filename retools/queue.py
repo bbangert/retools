@@ -1,5 +1,11 @@
 """Queue worker and manager
 
+.. note::
+
+    The queueing functionality is new, and has gone through some preliminary
+    testing. Please report any issues found on `the retools Github issue
+    tracker <https://github.com/bbangert/retools/issues>`_.
+
 Any function that takes keyword arguments can be a ``job`` that a worker runs.
 The :class:`~retools.queue.QueueManager` handles configuration and enqueing jobs
 to be run.
