@@ -350,8 +350,8 @@ class Worker(object):
         :param blocking: Whether or not blocking pop should be used. If the
                          blocking pop is used, then the worker will block for
                          ``interval`` seconds at a time waiting for a new
-                         job. This affects how often the worke can respond to
-                         OS signals.
+                         job. This affects how often the worker can respond to
+                         signals.
         :type blocking: bool
 
         """
