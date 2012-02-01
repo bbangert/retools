@@ -2,6 +2,7 @@
 import unittest
 import time
 import cPickle
+from contextlib import nested
 
 import redis
 import redis.client
@@ -183,7 +184,7 @@ class TestCacheRegion(unittest.TestCase):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
 
-            def a_func():
+            def a_func():  # pragma: nocover
                 return "This is a value: %s" % time.time()
             value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func)
             assert 'This is a NEW value' in value
@@ -214,7 +215,7 @@ class TestCacheRegion(unittest.TestCase):
                   if x[0] == 'execute']
             eq_(len(exec_calls), 1)
 
-    def test_existing_expired_value_with_lock(self):
+    def test_existing_expired_value_with_lock_timeout(self):
         mock_redis = Mock(spec=redis.client.Redis)
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         now = time.time()
@@ -222,9 +223,14 @@ class TestCacheRegion(unittest.TestCase):
                         'value': cPickle.dumps("This is a value")},
                    '0')]
 
-        def side_effect():
+        def side_effect(*args):
             return results.pop()
 
+        # Mock up an existing lock
+        mock_redis.setnx.return_value = False
+        mock_redis.get.return_value = False
+
+        # Other mocks
         mock_redis.exists.return_value = True
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
@@ -244,10 +250,48 @@ class TestCacheRegion(unittest.TestCase):
                   if x[0] == 'execute']
             eq_(len(exec_calls), 1)
 
+    def test_no_value_with_lock_timeout(self):
+        from retools.cache import NoneMarker
+        mock_redis = Mock(spec=redis.client.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        results = [0, ({}, '0')]
+
+        def side_effect(*args):
+            return results.pop()
+
+        # Mock up an existing lock
+        mock_redis.setnx.return_value = False
+        mock_redis.get.return_value = False
+
+        # Other mocks
+        mock_redis.exists.return_value = True
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_pipeline.execute.side_effect = side_effect
+
+        mock_sleep = Mock(spec=time.sleep)
+
+        with nested(
+            patch('retools.global_connection._redis', mock_redis),
+            patch('time.sleep', mock_sleep)
+            ):
+            CR = self._makeOne()
+            CR.add_region('short_term', 60)
+
+            called = []
+
+            def a_func():  # pragma: nocover
+                called.append(1)
+                return "This is a value: %s" % time.time()
+            value = CR.load('short_term', 'my_func', '1 2 3', callable=a_func)
+            eq_(value, NoneMarker)
+            eq_(called, [])
+            exec_calls = [x for x in mock_pipeline.method_calls \
+                  if x[0] == 'execute']
+            eq_(len(exec_calls), 1)
+
     def test_new_value_and_misses(self):
         mock_redis = Mock(spec=redis.client.Redis)
         mock_pipeline = Mock(spec=redis.client.Pipeline)
-        now = time.time()
         results = [None, ['30'], (None, '0')]
 
         def side_effect(*args, **kwargs):
@@ -366,7 +410,7 @@ class TestInvalidFunction(unittest.TestCase):
 
     def test_invalidate_function_without_args(self):
 
-        def my_func():
+        def my_func():  # pragma: nocover
             return "Hello"
         my_func._region = 'short_term'
         my_func._namespace = 'retools:a_key'
@@ -389,7 +433,7 @@ class TestInvalidFunction(unittest.TestCase):
 
     def test_invalidate_function_with_args(self):
 
-        def my_func(name):
+        def my_func(name):  # pragma: nocover
             return "Hello %s" % name
         my_func._region = 'short_term'
         my_func._namespace = 'retools:a_key decarg'
@@ -439,10 +483,10 @@ class TestCacheDecorator(unittest.TestCase):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
 
-            def dummy_func():
+            def dummy_func():  # pragma: nocover
                 return "This is a value: %s" % time.time()
             decorated = self._decorateFunc(dummy_func, 'long_term')
-            value = decorated()
+            decorated()
         test_it()
 
     def test_generate(self):
