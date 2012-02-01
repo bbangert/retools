@@ -11,8 +11,7 @@ class TestNamespaceFunc(unittest.TestCase):
         return func_namespace(func, deco_args)
 
     def test_func_name(self):
-        def a_func():
-            pass
+        def a_func(): pass
         eq_('retools.tests.test_util.a_func.', self._makeKey(a_func, []))
 
     def test_class_method_name(self):
