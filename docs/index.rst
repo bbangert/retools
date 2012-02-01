@@ -14,9 +14,10 @@ retools - A Python Redis Toolset
 - :mod:`Distributed Locking <retools.lock>`
     - Python context-manager with lock timeouts and retries
 - :mod:`Queuing <retools.queue>`
-    - Simple forking worker based on Resque
+    - Simple forking worker based on `Resque`_
     - Jobs stored as JSON in Redis for easy introspection
-    - setproctitle used by workers for easy worker introspection
+    - `setproctitle`_ used by workers for easy worker introspection on
+      the command line
 - Well Tested [1]_
     - 100% statement coverage
     - 100% condition coverage (via instrumental_)
@@ -44,3 +45,5 @@ Indices and tables
 
 .. _`Thundering Herd`: http://en.wikipedia.org/wiki/Thundering_herd_problem
 .. _instrumental: http://pypi.python.org/pypi/instrumental
+.. _Resque: https://github.com/defunkt/resque
+.. _setproctitle: http://pypi.python.org/pypi/setproctitle
