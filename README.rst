@@ -16,6 +16,10 @@ On the horizon for future implementation:
 * A worker/job processing system similar to Celery but based on how Ruby's
   Resque system works.
 
+.. image:: https://secure.travis-ci.org/bbangert/retools.png?branch=master
+   :alt: Build Status
+   :target: https://secure.travis-ci.org/bbangert/retools
+
 
 Caching
 =======
