@@ -30,6 +30,7 @@ from retools.lock import LockTimeout
 from retools.util import func_namespace
 from retools.util import has_self_arg
 
+from functools import wraps
 
 class _NoneMarker(object):
     pass
@@ -409,6 +410,7 @@ def cache_region(region, *deco_args, **kwargs):
         skip_self = has_self_arg(func)
         regenerate = kwargs.get('regenerate', True)
 
+        @wraps(func)
         def cached(*args):
             if region not in CacheRegion.regions:
                 raise CacheConfigurationError(
