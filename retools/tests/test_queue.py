@@ -39,8 +39,23 @@ class TestJob(TestQueue):
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         mock_redis.pipeline.return_value = mock_pipeline
         qm = self._makeQM(redis=mock_redis)
+
         job_id = qm.enqueue('retools.tests.jobs:echo_default',
                             default='hi there')
+
+        mock_redis.llen = Mock(return_value=1)
+        job = json.dumps({'job_id': job_id,
+                          'job': 'retools.tests.jobs:echo_default',
+                          'kwargs': {},
+                          'state': '',
+                          'events': {}})
+
+        mock_redis.lindex = Mock(return_value=job)
+
+        jobs = list(qm.get_jobs())
+        self.assertEqual(len(jobs), 1)
+        my_job = qm.get_job(job_id)
+        self.assertEqual(my_job.job_name, 'retools.tests.jobs:echo_default')
         meth, args, kw = mock_pipeline.method_calls[0]
         eq_('rpush', meth)
         eq_(kw, {})

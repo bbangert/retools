@@ -148,17 +148,18 @@ class QueueManager(object):
         full_queue_name = 'retools:queue:' + queue_name
         current_len = self.redis.llen(full_queue_name)
 
+        # that's O(n), we should do better
         for i in range(current_len):
             # the list can change while doing this
             # so we need to catch any index error
             job = self.redis.lindex(full_queue_name, i)
-            job = json.loads(job)
+            job_data = json.loads(job)
 
-            if job['job_id'] == job_id:
+            if job_data['job_id'] == job_id:
                 if not full_job:
-                    return job['job_id']
+                    return job_data['job_id']
 
-                return Job(full_queue_name, job)
+                return Job(full_queue_name, job, self.redis)
 
         raise IndexError(job_id)
 
