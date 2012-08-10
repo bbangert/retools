@@ -51,12 +51,16 @@ class TestJob(TestQueue):
         eq_(job_data['kwargs'], {"default": "hi there"})
         mock_redis.llen = Mock(return_value=1)
 
+        created = time.time()
+
         # trying get_jobs/get_job
         job = json.dumps({'job_id': job_id,
                           'job': 'retools.tests.jobs:echo_default',
                           'kwargs': {},
                           'state': '',
-                          'events': {}})
+                          'events': {},
+                          'metadata': {'created': created}
+                         })
 
         mock_redis.lindex = Mock(return_value=job)
 
@@ -64,6 +68,7 @@ class TestJob(TestQueue):
         self.assertEqual(len(jobs), 1)
         my_job = qm.get_job(job_id)
         self.assertEqual(my_job.job_name, 'retools.tests.jobs:echo_default')
+        self.assertEqual(my_job.metadata['created'], created)
 
         # testing the Worker class methods
         from retools.queue import Worker

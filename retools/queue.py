@@ -212,6 +212,10 @@ class QueueManager(object):
         if not queue_name:
             queue_name = self.job_config.get('job', self.default_queue_name)
 
+        metadata = kwargs.pop('metadata', None)
+        if metadata is None:
+            metadata = {}
+
         full_queue_name = 'retools:queue:' + queue_name
         job_id = uuid.uuid4().hex
         events = self.global_events.copy()
@@ -224,6 +228,7 @@ class QueueManager(object):
             'job': job,
             'kwargs': kwargs,
             'events': events,
+            'metadata': metadata,
             'state': {}
         }
         pipeline = self.redis.pipeline()
@@ -267,6 +272,7 @@ class Job(object):
         self.queue_name = queue_name
         self.kwargs = payload['kwargs']
         self.state = payload['state']
+        self.metadata = payload.get('metadata', {})
         self.events = {}
         self.redis = redis
         self.func = None
@@ -326,7 +332,8 @@ class Job(object):
             'job': self.job_name,
             'kwargs': self.kwargs,
             'events': self.payload['events'],
-            'state': self.state}
+            'state': self.state,
+            'metadata': self.metadata}
 
     def to_json(self):
         return json.dumps(self.to_dict())
