@@ -3,6 +3,23 @@ Changelog
 =========
 
 
+0.3 (08/13/2012)
+================
+
+Bug Fixes
+---------
+
+- Call redis.expire with proper expires value for RedisLock. Patch by
+  Mike McCabe.
+- Use functools.wraps to preserve doc strings for cache_region. Patch by
+  Daniel Holth.
+
+API Changes
+-----------
+
+- Added get_job/get_jobs methods to QueueManager class to get information
+  on a job or get a list of jobs for a queue.
+
 0.2 (02/01/2012)
 ================
 
