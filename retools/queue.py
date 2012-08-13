@@ -141,6 +141,45 @@ class QueueManager(object):
         """
         self.job_config[job_name] = queue_name
 
+    def get_job(self, job_id, queue_name=None, full_job=True):
+        if queue_name is None:
+            queue_name = self.default_queue_name
+
+        full_queue_name = 'retools:queue:' + queue_name
+        current_len = self.redis.llen(full_queue_name)
+
+        # that's O(n), we should do better
+        for i in range(current_len):
+            # the list can change while doing this
+            # so we need to catch any index error
+            job = self.redis.lindex(full_queue_name, i)
+            job_data = json.loads(job)
+
+            if job_data['job_id'] == job_id:
+                if not full_job:
+                    return job_data['job_id']
+
+                return Job(full_queue_name, job, self.redis)
+
+        raise IndexError(job_id)
+
+    def get_jobs(self, queue_name=None, full_job=True):
+        if queue_name is None:
+            queue_name = self.default_queue_name
+
+        full_queue_name = 'retools:queue:' + queue_name
+        current_len = self.redis.llen(full_queue_name)
+
+        for i in range(current_len):
+            # the list can change while doing this
+            # so we need to catch any index error
+            job = self.redis.lindex(full_queue_name, i)
+            if not full_job:
+                job_dict = json.loads(job)
+                yield job_dict['job_id']
+
+            yield Job(full_queue_name, job, self.redis)
+
     def subscriber(self, event, job=None, handler=None):
         """Set events for a specific job or for all jobs
 
@@ -173,6 +212,10 @@ class QueueManager(object):
         if not queue_name:
             queue_name = self.job_config.get('job', self.default_queue_name)
 
+        metadata = kwargs.pop('metadata', None)
+        if metadata is None:
+            metadata = {}
+
         full_queue_name = 'retools:queue:' + queue_name
         job_id = uuid.uuid4().hex
         events = self.global_events.copy()
@@ -185,6 +228,7 @@ class QueueManager(object):
             'job': job,
             'kwargs': kwargs,
             'events': events,
+            'metadata': metadata,
             'state': {}
         }
         pipeline = self.redis.pipeline()
@@ -228,6 +272,7 @@ class Job(object):
         self.queue_name = queue_name
         self.kwargs = payload['kwargs']
         self.state = payload['state']
+        self.metadata = payload.get('metadata', {})
         self.events = {}
         self.redis = redis
         self.func = None
@@ -281,19 +326,24 @@ class Job(object):
             self.run_event('job_failure', exc=exc)
             return False
 
-    def enqueue(self):
-        """Queue this job in Redis"""
-        full_queue_name = self.queue_name
-        job_dct = {
+    def to_dict(self):
+        return {
             'job_id': self.job_id,
             'job': self.job_name,
             'kwargs': self.kwargs,
             'events': self.payload['events'],
-            'state': self.state
-        }
+            'state': self.state,
+            'metadata': self.metadata}
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
+
+    def enqueue(self):
+        """Queue this job in Redis"""
+        full_queue_name = self.queue_name
         queue_name = full_queue_name.lstrip('retools:queue:')
         pipeline = self.redis.pipeline()
-        pipeline.rpush(full_queue_name, json.dumps(job_dct))
+        pipeline.rpush(full_queue_name, self.to_json())
         pipeline.sadd('retools:queues', queue_name)
         pipeline.execute()
         return self.job_id
@@ -327,6 +377,26 @@ class Worker(object):
         self.job = None
         self.child_id = None
         self.jobs = {}  # job function import cache
+
+    @classmethod
+    def get_workers(cls, redis=None):
+        redis = redis or global_connection.redis
+        for worker_id in redis.smembers('retools:workers'):
+            yield cls.from_id(worker_id)
+
+    @classmethod
+    def get_worker_ids(cls, redis=None):
+        redis = redis or global_connection.redis
+        return redis.smembers('retools:workers')
+
+    @classmethod
+    def from_id(cls, worker_id, redis=None):
+        redis = redis or global_connection.redis
+        if not redis.sismember("retools:workers", worker_id):
+            raise IndexError(worker_id)
+        queues = redis.get("retools:worker:%s:queues" % worker_id)
+        queues = queues.split(',')
+        return Worker(queues, redis)
 
     @property
     def worker_id(self):
@@ -427,6 +497,8 @@ class Worker(object):
         pipeline = self.redis.pipeline()
         pipeline.sadd("retools:workers", self.worker_id)
         pipeline.set("retools:worker:%s:started" % self.worker_id, time.time())
+        pipeline.set("retools:worker:%s:queues" % self.worker_id,
+                     self.queue_names)
         pipeline.execute()
 
     def unregister_worker(self, worker_id=None):
@@ -436,6 +508,7 @@ class Worker(object):
         pipeline.srem("retools:workers", worker_id)
         pipeline.delete("retools:worker:%s" % worker_id)
         pipeline.delete("retools:worker:%s:started" % worker_id)
+        pipeline.delete("retools:worker:%s:queues" % worker_id)
         pipeline.execute()
 
     def startup(self):
