@@ -442,7 +442,11 @@ class Worker(object):
                     if self.child_id:
                         self.set_proc_title("Forked %s at %s" % (
                             self.child_id, datetime.now()))
-                        os.wait()
+                        try:
+                            os.wait()
+                        except OSError:
+                            # got killed
+                            pass
                     else:
                         self.set_proc_title("Processing %s since %s" % (
                             self.job.queue_name, datetime.now()))
