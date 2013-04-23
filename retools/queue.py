@@ -124,6 +124,7 @@ class QueueManager(object):
 
         :param redis: A Redis instance. Defaults to the redis instance
                       on the global_connection.
+        :param default_queue_name: The default queue name. Defaults to 'main'.
         :param serializer: A callable to serialize json data, defaults
                             to json.dumps().
         :param deserializer: A callable to deserialize json data, defaults
