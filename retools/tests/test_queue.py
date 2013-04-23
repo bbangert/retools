@@ -5,6 +5,7 @@ import time
 import redis
 import redis.client
 import json
+from decimal import Decimal
 
 from nose.tools import raises
 from nose.tools import eq_
@@ -90,3 +91,32 @@ class TestJob(TestQueue):
             self.assertEqual(ids, [worker.worker_id])
         finally:
             worker.unregister_worker()
+
+    def test_custom_serializer(self):
+        mock_redis = Mock(spec=redis.Redis)
+        mock_pipeline = Mock(spec=redis.client.Pipeline)
+        mock_redis.pipeline.return_value = mock_pipeline
+
+        def serialize(data):
+            import simplejson
+            return simplejson.dumps(data, use_decimal=True)
+
+
+        def deserialize(data):
+            import simplejson
+            return simplejson.loads(data, use_decimal=True)
+
+        qm = self._makeQM(redis=mock_redis, serializer=serialize,
+                          deserializer=deserialize)
+
+        job_id = qm.enqueue('retools.tests.jobs:echo_default',
+                            decimal_value=Decimal('1.2'))
+        meth, args, kw = mock_pipeline.method_calls[0]
+        eq_('rpush', meth)
+        eq_(kw, {})
+        queue_name, job_body = args
+        job_data = deserialize(job_body)
+        eq_(job_data['job_id'], job_id)
+        eq_(job_data['kwargs'], {'decimal_value': Decimal('1.2')})
+
+

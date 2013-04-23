@@ -118,11 +118,16 @@ from retools.util import with_nested_contexts
 
 class QueueManager(object):
     """Configures and enqueues jobs"""
-    def __init__(self, redis=None, default_queue_name='main'):
+    def __init__(self, redis=None, default_queue_name='main',
+                 serializer=json.dumps, deserializer=json.loads):
         """Initialize a QueueManager
 
         :param redis: A Redis instance. Defaults to the redis instance
                       on the global_connection.
+        :param serializer: A callable to serialize json data, defaults
+                            to json.dumps().
+        :param deserializer: A callable to deserialize json data, defaults
+                              to json.loads().
         """
         self.default_queue_name = default_queue_name
         self.redis = redis or global_connection.redis
@@ -130,6 +135,8 @@ class QueueManager(object):
         self.job_config = {}
         self.job_events = {}
         self.global_events = {}
+        self.serializer = serializer
+        self.deserializer = deserializer
 
     def set_queue_for_job(self, job_name, queue_name):
         """Set the queue that a given job name will go to
@@ -153,13 +160,15 @@ class QueueManager(object):
             # the list can change while doing this
             # so we need to catch any index error
             job = self.redis.lindex(full_queue_name, i)
-            job_data = json.loads(job)
+            job_data = self.deserializer(job)
 
             if job_data['job_id'] == job_id:
                 if not full_job:
                     return job_data['job_id']
 
-                return Job(full_queue_name, job, self.redis)
+                return Job(full_queue_name, job, self.redis,
+                           serializer=self.serializer,
+                           deserializer=self.deserializer)
 
         raise IndexError(job_id)
 
@@ -175,10 +184,12 @@ class QueueManager(object):
             # so we need to catch any index error
             job = self.redis.lindex(full_queue_name, i)
             if not full_job:
-                job_dict = json.loads(job)
+                job_dict = self.deserializer(job)
                 yield job_dict['job_id']
 
-            yield Job(full_queue_name, job, self.redis)
+            yield Job(full_queue_name, job, self.redis,
+                      serializer=self.serializer,
+                      deserializer=self.deserializer)
 
     def subscriber(self, event, job=None, handler=None):
         """Set events for a specific job or for all jobs
@@ -232,14 +243,15 @@ class QueueManager(object):
             'state': {}
         }
         pipeline = self.redis.pipeline()
-        pipeline.rpush(full_queue_name, json.dumps(job_dct))
+        pipeline.rpush(full_queue_name, self.serializer(job_dct))
         pipeline.sadd('retools:queues', queue_name)
         pipeline.execute()
         return job_id
 
 
 class Job(object):
-    def __init__(self, queue_name, job_payload, redis):
+    def __init__(self, queue_name, job_payload, redis,
+                 serializer=json.dumps, deserializer=json.loads):
         """Create a job instance given a JSON job payload
 
         :param job_payload: A JSON string representing a job.
@@ -261,12 +273,17 @@ class Job(object):
           can be stored in the ``state`` dict.
         * **func**: A reference to the job function
         * **redis**: A :class:`redis.Redis` instance.
-
+        * **serializer**: A callable to serialize json data, defaults
+          to :func:`json.dumps`.
+        * **deserializer**: A callable to deserialize json data, defaults
+          to :func:`json.loads`.
         """
         global current_job
         current_job = self
 
-        self.payload = payload = json.loads(job_payload)
+        self.deserializer = deserializer
+        self.serializer = serializer
+        self.payload = payload = deserializer(job_payload)
         self.job_id = payload['job_id']
         self.job_name = payload['job']
         self.queue_name = queue_name
@@ -336,7 +353,7 @@ class Job(object):
             'metadata': self.metadata}
 
     def to_json(self):
-        return json.dumps(self.to_dict())
+        return self.serializer(self.to_dict())
 
     def enqueue(self):
         """Queue this job in Redis"""
@@ -482,7 +499,8 @@ class Worker(object):
             return False
 
         self.job = job = Job(queue_name=queue_name, job_payload=job_payload,
-                             redis=self.redis)
+                             redis=self.redis, serializer=self.serializer,
+                             deserializer=self.deserializer)
         try:
             job.func = self.jobs[job.job_name]
         except KeyError:
@@ -570,7 +588,8 @@ class Worker(object):
             'run_at': time.time(),
             'payload': self.job.payload
         }
-        self.redis.set("retools:worker:%s" % self.worker_id, json.dumps(data))
+        self.redis.set("retools:worker:%s" % self.worker_id,
+                       self.serializer(data))
 
     def done_working(self):
         """Called when we're done working on a job"""
