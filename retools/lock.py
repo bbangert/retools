@@ -1,20 +1,39 @@
 """A Redis backed distributed global lock
 
-This lock based mostly on this excellent example:
+This code uses the formula here:
+https://github.com/jeffomatic/redis-exp-lock-js
+
+It provides several improvements over the original version based on:
 http://chris-lamb.co.uk/2010/06/07/distributing-locking-python-and-redis/
 
-This code add's one change as suggested by the Redis documentation regarding
-using locks in Redis, which is to only delete the Redis lock if we actually
-completed within the timeout period. If we took too long to execute, then the
-lock stored here is actually from a *different* client holding a lock and
-we shouldn't be deleting their lock.
+It provides a few improvements over the one present in the Python redis
+library, for example since it utilizes the Lua functionality, it no longer
+requires every client to have synchronized time.
 
 """
 # Copyright 2010,2011 Chris Lamb <lamby@debian.org>
 
 import time
+import uuid
 
 from retools import global_connection
+
+
+acquire_lua = """
+local result = redis.call('SETNX', KEYS[1], ARGV[1])
+if result == 1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[2])
+end
+return result"""
+
+
+release_lua = """
+local deleted = 0
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+end
+return 0
+"""
 
 
 class Lock(object):
@@ -44,39 +63,45 @@ class Lock(object):
         if not redis:
             redis = global_connection.redis
         self.redis = redis
-        self.start_time = time.time()
+        self._acquire_lua = redis.register_script(acquire_lua)
+        self._release_lua = redis.register_script(release_lua)
+        self.lock_key = None
 
     def __enter__(self):
-        redis = self.redis
+        self.acquire()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.release()
+
+    def acquire(self):
+        """Acquire the lock
+
+        :returns: Whether the lock was acquired or not
+        :rtype: bool
+
+        """
+        self.lock_key = uuid.uuid4().hex
         timeout = self.timeout
         while timeout >= 0:
-            expires = time.time() + self.expires + 1
-
-            if redis.setnx(self.key, expires):
-                # We gained the lock; enter critical section
-                self.start_time = time.time()
-                redis.expire(self.key, int(self.expires))
+            if self._acquire_lua(keys=[self.key],
+                                 args=[self.lock_key, self.expires]):
                 return
-
-            current_value = redis.get(self.key)
-
-            # We found an expired lock and nobody raced us to replacing it
-            if current_value and float(current_value) < time.time() and \
-               redis.getset(self.key, expires) == current_value:
-                self.start_time = time.time()
-                redis.expire(self.key, int(self.expires))
-                return
-
             timeout -= 1
             if timeout >= 0:
                 time.sleep(1)
         raise LockTimeout("Timeout while waiting for lock")
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        # Only delete the key if we completed within the lock expiration,
-        # otherwise, another lock might've been established
-        if time.time() - self.start_time < self.expires:
-            self.redis.delete(self.key)
+    def release(self):
+        """Release the lock
+
+        This only releases the lock if it matches the UUID we think it
+        should have, to prevent deleting someone else's lock if we
+        lagged.
+
+        """
+        if self.lock_key:
+            self._release_lua(keys=[self.key], args=[self.lock_key])
+        self.lock_key = None
 
 
 class LockTimeout(BaseException):

@@ -30,7 +30,7 @@ setup(name='retools',
       setup_requires=["nose"],
       install_requires=[
           "setproctitle>=1.1.2",
-          "redis>=2.4.5",
+          "redis>=2.7.3",
       ],
       entry_points="""
       [console_scripts]

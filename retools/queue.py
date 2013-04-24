@@ -129,6 +129,7 @@ class QueueManager(object):
                             to json.dumps().
         :param deserializer: A callable to deserialize json data, defaults
                               to json.loads().
+
         """
         self.default_queue_name = default_queue_name
         self.redis = redis or global_connection.redis
@@ -146,6 +147,7 @@ class QueueManager(object):
                          retools.jobs:my_function
         :param queue_name: Name of the queue on Redis job payloads should go
                            to
+
         """
         self.job_config[job_name] = queue_name
 
