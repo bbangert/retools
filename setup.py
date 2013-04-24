@@ -27,6 +27,7 @@ setup(name='retools',
       zip_safe=False,
       tests_require = ['pkginfo', 'Mock>=0.8rc2', 'nose',
                        'simplejson'],
+      setup_requires=["nose"],
       install_requires=[
           "setproctitle>=1.1.2",
           "redis>=2.4.5",
