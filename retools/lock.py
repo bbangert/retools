@@ -37,8 +37,7 @@ return 0
 
 class Lock(object):
     def __init__(self, key, expires=60, timeout=10, redis=None):
-        """
-        Distributed locking using Redis SETNX and GETSET.
+        """Distributed locking using Redis Lua scripting for CAS operations.
 
         Usage::
 
