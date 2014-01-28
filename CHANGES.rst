@@ -2,6 +2,13 @@
 Changelog
 =========
 
+0.4 (01/27/2014)
+================
+
+Features
+--------
+
+- Added limiter functionality. Pull request #22, by Bernardo Heynemann.
 
 0.3 (08/13/2012)
 ================
@@ -54,7 +61,7 @@ Backwards Incompatibilities
 
       import redis
       from retools import global_connection
-      
+
       global_connection.redis = redis.Redis(host='myhost')
 
 
