@@ -19,6 +19,8 @@ retools - A Python Redis Toolset
     - `setproctitle`_ used by workers for easy worker introspection on
       the command line
     - :ref:`Rich event system <queue_events>` for extending job processing behavior
+- :mod:`Limiter <retools.limiter>`
+    - Useful for making sure that only N operations for a given process happen at the same time
 - Well Tested [1]_
     - 100% statement coverage
     - 100% condition coverage (via instrumental_)
