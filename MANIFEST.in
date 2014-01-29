@@ -1,0 +1,5 @@
+recursive-include docs *
+include CHANGES.rst
+include LICENSE.txt
+
+global-exclude .DS_Store *.hgignore *.hgtags
