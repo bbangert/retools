@@ -1,5 +1,6 @@
 """Utility functions"""
 import inspect
+from itertools import izip
 
 
 def func_namespace(func, deco_args):
@@ -50,3 +51,14 @@ def with_nested_contexts(context_managers, func, args, kwargs):
         with ctx_manager(func, *args, **kwargs):
             return with_nested_contexts(context_managers[1:],
                   func, args, kwargs)
+
+
+def chunks(iterable, n):
+    args = [iter(iterable)] * n
+    return izip(*args)
+
+
+def flip_pairs(l):
+    for x, y in chunks(l, 2):
+        yield y
+        yield x

@@ -141,3 +141,45 @@ class TestLimiterWithActualRedis(unittest.TestCase):
 
         has_limit = limiter.acquire_limit(key='test3')
         eq_(has_limit, True)
+
+class TestLimiterWithStrictRedis(unittest.TestCase):
+    def setUp(self):
+        self.redis = redis.StrictRedis()
+
+    def test_has_limit(self):
+        limiter = Limiter(prefix='test-%.6f' % time.time(), limit=2, expiration_in_seconds=400, redis=self.redis)
+
+        has_limit = limiter.acquire_limit(key='test1')
+        eq_(has_limit, True)
+
+        has_limit = limiter.acquire_limit(key='test2')
+        eq_(has_limit, True)
+
+        has_limit = limiter.acquire_limit(key='test3')
+        eq_(has_limit, False)
+
+    def test_has_limit_after_removing_items(self):
+        limiter = Limiter(prefix='test-%.6f' % time.time(), limit=2, expiration_in_seconds=400, redis=self.redis)
+
+        has_limit = limiter.acquire_limit(key='test1')
+        eq_(has_limit, True)
+
+        has_limit = limiter.acquire_limit(key='test2', expiration_in_seconds=-1)
+        eq_(has_limit, True)
+
+        has_limit = limiter.acquire_limit(key='test3')
+        eq_(has_limit, True)
+
+    def test_has_limit_after_releasing_items(self):
+        limiter = Limiter(prefix='test-%.6f' % time.time(), limit=2, expiration_in_seconds=400, redis=self.redis)
+
+        has_limit = limiter.acquire_limit(key='test1')
+        eq_(has_limit, True)
+
+        has_limit = limiter.acquire_limit(key='test2')
+        eq_(has_limit, True)
+
+        limiter.release_limit(key='test2')
+
+        has_limit = limiter.acquire_limit(key='test3')
+        eq_(has_limit, True)

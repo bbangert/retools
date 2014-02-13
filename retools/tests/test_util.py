@@ -53,3 +53,25 @@ class TestContextManager(unittest.TestCase):
 class DummyClass(object):  # pragma: nocover
     def class_method(cls):
         return arg
+
+
+class TestChunks(unittest.TestCase):
+    def test_can_get_chunks(self):
+        from retools.util import chunks
+        items = [1, 2, 3, 4]
+
+        eq_(list(chunks(items, 2)), [(1, 2), (3, 4)])
+
+
+class TestFlipPairs(unittest.TestCase):
+    def test_can_flip_pairs(self):
+        from retools.util import flip_pairs
+        items = [1, 2, 3, 4]
+
+        eq_(list(flip_pairs(items)), [2, 1, 4, 3])
+
+
+#def flip_pairs(l):
+    #for x, y in chunks(l, 2):
+        #yield y
+        #yield x
