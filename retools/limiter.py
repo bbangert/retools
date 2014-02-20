@@ -42,7 +42,10 @@ This way if your process dies in the mid of its operation, the keys will eventua
 
 import time
 
+import redis
+
 from retools import global_connection
+from retools.util import flip_pairs
 
 
 class Limiter(object):
@@ -96,4 +99,21 @@ class Limiter(object):
 
     def __lock_limit(self, key, expiration_in_seconds=None):
         expiration = expiration_in_seconds or self.expiration_in_seconds
-        self.redis.zadd(self.prefix, key, time.time() + expiration)
+        self.__zadd(self.prefix, key, time.time() + expiration)
+
+    def __zadd(self, set_name, *args, **kwargs):
+        """
+        Custom ZADD interface that adapts to match the argument order of the currently
+        used backend.  Using this method makes it transparent whether you use a Redis
+        or a StrictRedis connection.
+
+        Found this code at https://github.com/ui/rq-scheduler/pull/17.
+        """
+        conn = self.redis
+
+        # If we're dealing with StrictRedis, flip each pair of imaginary
+        # (name, score) tuples in the args list
+        if conn.__class__ is redis.StrictRedis:  # StrictPipeline is a subclass of StrictRedis, too
+            args = tuple(flip_pairs(args))
+
+        return conn.zadd(set_name, *args)
