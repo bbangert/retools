@@ -2,6 +2,15 @@
 Changelog
 =========
 
+0.4.1 (02/19/2014)
+==================
+
+Bug Fixes
+---------
+
+- Properly support StrictRedis with ZADD (used in the limiter). Patch by
+  Bernardo Heynemann.
+
 0.4 (01/27/2014)
 ================
 
