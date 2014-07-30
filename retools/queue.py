@@ -376,7 +376,7 @@ class Job(object):
 
 class Worker(object):
     """A Worker works on jobs"""
-    def __init__(self, queues, redis=None):
+    def __init__(self, queues, redis=None, serializer=json.dumps, deserializer=json.loads):
         """Create a worker
 
         :param queues: List of queues to process
@@ -389,6 +389,8 @@ class Worker(object):
 
         """
         self.redis = redis or global_connection.redis
+        self.serializer = serializer
+        self.deserializer = deserializer
         if not queues:
             raise ConfigurationError(
                   "No queues were configured for this worker")
