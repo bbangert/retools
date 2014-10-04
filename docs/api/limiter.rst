@@ -1,4 +1,4 @@
-.. _queue_module:
+.. _limiter_module:
 
 :mod:`retools.limiter`
 --------------------
