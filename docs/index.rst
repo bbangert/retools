@@ -6,6 +6,11 @@ retools - A Python Redis Toolset
 
 `retools` is a concise set of well-tested extensible Python Redis tools.
 
+`retools` is available on PyPI at https://pypi.python.org/pypi/retools
+
+.. image:: https://badge.fury.io/py/retools.svg
+    :target: http://badge.fury.io/py/retools
+
 - :mod:`Caching <retools.cache>`
     - Hit/Miss Statistics
     - Regions for common expiration periods and invalidating batches of

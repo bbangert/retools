@@ -6,6 +6,11 @@ Redis Tools (retools)
 Redis backed Python tools that are always 100% unit tested, fast, efficient,
 and utilize the capabilities of Redis.
 
+`retools` is available on PyPI at https://pypi.python.org/pypi/retools
+
+.. image:: https://badge.fury.io/py/retools.svg
+    :target: http://badge.fury.io/py/retools
+
 Current tools in ``retools``:
 
 * Caching
