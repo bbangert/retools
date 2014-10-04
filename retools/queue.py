@@ -12,12 +12,17 @@ to be run.
 
 Declaring jobs::
 
+    # mypackage/jobs.py
+
+    # jobs
+
     def default_job():
         # do some basic thing
 
     def important(somearg=None):
         # do an important thing
 
+    # event handlers
 
     def my_event_handler(sender, **kwargs):
         # do something
