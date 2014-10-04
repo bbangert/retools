@@ -1,7 +1,7 @@
 .. _limiter_module:
 
 :mod:`retools.limiter`
---------------------
+----------------------
 
 .. automodule:: retools.limiter
 
