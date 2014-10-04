@@ -2,9 +2,9 @@
 Redis Tools (retools)
 =====================
 
-``retools`` is a package of Redis tools. It's aim is to provide a variety of
-Redis backed Python tools that are always 100% unit tested, fast, efficient,
-and utilize the capabilities of Redis.
+``retools`` is a package of `Redis <http://redis.io/>`_ tools. It's aim is to
+provide a variety of Redis backed Python tools that are always 100% unit
+tested, fast, efficient, and utilize the capabilities of Redis.
 
 Current tools in ``retools``:
 
