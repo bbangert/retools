@@ -10,5 +10,6 @@ organized alphabetically by module name.
 
    api/cache
    api/exc
+   api/limiter
    api/lock
    api/queue
