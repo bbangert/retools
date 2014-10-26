@@ -48,5 +48,5 @@ Indices and tables
 
 .. _`Thundering Herd`: http://en.wikipedia.org/wiki/Thundering_herd_problem
 .. _instrumental: http://pypi.python.org/pypi/instrumental
-.. _Resque: https://github.com/defunkt/resque
+.. _Resque: https://github.com/resque/resque
 .. _setproctitle: http://pypi.python.org/pypi/setproctitle
