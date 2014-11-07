@@ -361,7 +361,7 @@ class Job(object):
     def enqueue(self):
         """Queue this job in Redis"""
         full_queue_name = self.queue_name
-        queue_name = full_queue_name.lstrip('retools:queue:')
+        queue_name = full_queue_name[len('retools:queue:'):]
         pipeline = self.redis.pipeline()
         pipeline.rpush(full_queue_name, self.to_json())
         pipeline.sadd('retools:queues', queue_name)
@@ -428,7 +428,7 @@ class Worker(object):
 
     @property
     def queue_names(self):
-        names = [x.lstrip('retools:queue:') for x in self.queues]
+        names = [x[len('retools:queue:'):] for x in self.queues]
         return ','.join(names)
 
     def work(self, interval=5, blocking=False):
