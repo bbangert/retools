@@ -85,7 +85,7 @@ that can spawn a worker. Queues to watch can be listed in order for priority
 queueing, in which case the worker will try each queue in order looking for jobs
 to process.
 
-Example invokation:
+Example invocation:
 
 .. code-block:: bash
 
