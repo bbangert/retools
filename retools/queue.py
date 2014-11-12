@@ -10,7 +10,13 @@ Any function that takes keyword arguments can be a ``job`` that a worker runs.
 The :class:`~retools.queue.QueueManager` handles configuration and enqueing jobs
 to be run.
 
-Declaring jobs::
+Declaring jobs:
+
+.. code-block:: python
+
+    # mypackage/jobs.py
+
+    # jobs
 
     def default_job():
         # do some basic thing
@@ -18,6 +24,7 @@ Declaring jobs::
     def important(somearg=None):
         # do an important thing
 
+    # event handlers
 
     def my_event_handler(sender, **kwargs):
         # do something
