@@ -15,6 +15,7 @@ requires every client to have synchronized time.
 
 import time
 import uuid
+import random
 
 from retools import global_connection
 
@@ -80,13 +81,15 @@ class Lock(object):
         """
         self.lock_key = uuid.uuid4().hex
         timeout = self.timeout
+        retry_sleep = 0.005
         while timeout >= 0:
             if self._acquire_lua(keys=[self.key],
                                  args=[self.lock_key, self.expires]):
                 return
             timeout -= 1
             if timeout >= 0:
-                time.sleep(1)
+                time.sleep(random.uniform(0, retry_sleep))
+                retry_sleep = min(retry_sleep*2, 1)
         raise LockTimeout("Timeout while waiting for lock")
 
     def release(self):
