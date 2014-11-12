@@ -75,7 +75,7 @@ Event functions have different call semantics, the following is a list of how
 the event functions will be called:
 
 * **job_prerun**: (job=job_instance)
-* **job_wrapper**: (job_function, job_instance, **job_keyword_arguments)
+* **job_wrapper**: (job_function, job_instance, \*\*job_keyword_arguments)
 * **job_postrun**: (job=job_instance, result=job_function_result)
 * **job_failure**: (job=job_instance, exc=job_exception)
 
