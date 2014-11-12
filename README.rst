@@ -10,11 +10,9 @@ Current tools in ``retools``:
 
 * Caching
 * Global Lock
-
-On the horizon for future implementation:
-
-* A worker/job processing system similar to Celery but based on how Ruby's
-  Resque system works.
+* Queues - A worker/job processing system similar to `Celery
+  <http://www.celeryproject.org/>`_ but based on how Ruby's `Resque
+  <https://github.com/defunkt/resque>`_ system works.
 
 .. image:: https://secure.travis-ci.org/bbangert/retools.png?branch=master
    :alt: Build Status
